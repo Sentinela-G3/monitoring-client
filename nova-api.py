@@ -13,7 +13,7 @@ cnx = mysql.connector.connect(
     database = "sentinela"
 )
 
-mycursor = cnx.cursor()
+mycursor = cnx.cursor(dictionary=True)
 
 
 def menu_inicial():
@@ -86,9 +86,36 @@ def cadastrar_maquina():
     print("\n=========================================================================")
     setor = input("Qual é o setor da sua máquina?: ").strip()
     print("\n=========================================================================")
+
+    windowsBo = False;
+    linuxBo = False;
+    macosBo = False;
+    if sistema_operacional == "Windows":
+        windowsBo = True;
+    elif sistema_operacional == "Linux":
+        linuxBo = True;
+    elif sistema_operacional == "Darwin":
+        macosBo = True;
     print("Identificamos o modelo do sistema operacional da sua maquina {}".format(sistema_operacional))
-    # Por enquanto só de windows
-    print("Identificamos o número serial da sua maquina {}".format(serial_number))
+    
+    if windowsBo == True:
+        def get_serial():
+            result = subprocess.check_output("wmic bios get serialnumber", shell=True)
+            return result.decode().split("\n")[1].strip()
+    elif linuxBo == True:
+        def get_serial():
+            result = subprocess.check_output("sudo dmidecode -s system-serial-number", shell=True)
+            return result.decode().strip()
+    elif macosBo == True:
+        def get_serial():
+            result = subprocess.check_output("system_profiler SPHardwareDataType | grep 'Serial Number'", shell=True)
+            return result.decode().split(":")[1].strip()
+    else:
+        def get_serial():
+            result = "Não encontrado"
+            return result
+
+    print("Identificamos o número serial da sua maquina {}".format(get_serial()))
     print("\n=========================================================================")
     print("\nQual é o status da sua máquina?")
     status = input("""
@@ -144,59 +171,77 @@ menu_inicial()
 
 
 def monitoramento_em_tempo_real():
-    print("\nIniciando monitoramento em tempo real...")
-    print("Coletando dados de monitoramento...")
-    while True:
-        # Porcentagem de uso da CPU nos últimos 1 segundo
-        cpu_porcentagem = psutil.cpu_percent(interval=1)
-        # Porcentagem de memória RAM atualmente em uso
-        memoria_porcentagem = psutil.virtual_memory().percent
-        # Porcentagem de espaço utilizado no disco principal
-        disco_percentagem = psutil.disk_usage('/').percent
-        # Dados de tráfego de rede  
-        rede = psutil.net_io_counters()
-        # Quantidade total de bytes enviados pela rede desde a inicialização do sistema
-        bytes_enviados = rede.bytes_sent  
-        # Quantidade total de bytes recebidos pela rede desde a inicialização do sistema
-        bytes_recebidos = rede.bytes_recv  
-        # Número total de pacotes enviados pela rede desde a inicialização do sistema
-        pacotes_enviados = rede.packets_sent  
-        # Número total de pacotes recebidos pela rede desde a inicialização do sistema
-        pacotes_recebidos = rede.packets_recv  
 
-        print("=========================================================================")
-        print("Dados de monitoramento")
-        print("Uso da CPU: {:.2f}%".format(cpu_porcentagem))
-        print("Uso da Memória RAM: {:.2f}%".format(memoria_porcentagem))
-        print("Uso do Disco: {:.2f}%".format(disco_percentagem))
-        print("Total de bytes enviados pela rede: {} bytes".format(bytes_enviados))
-        print("Total de bytes recebidos pela rede: {} bytes".format(bytes_recebidos))
-        print("Total de pacotes enviados pela rede: {}".format(pacotes_enviados))
-        print("Total de pacotes recebidos pela rede: {}".format(pacotes_recebidos))
-        print("=========================================================================")
+    escolher_maquina = input("Qual máquina você deseja monitorar?:" ).strip()
+    sql = "SELECT id_maquina, modelo, so, serial_number, status, setor FROM maquina WHERE id_maquina = %s"
+    val = (escolher_maquina, )
+    mycursor.execute(sql,val)
+
+    maquina_escolhida = mycursor.fetchone()
+
+    if maquina_escolhida:
+        print("Máquina encontrada:")
+        print(f"ID: {maquina_escolhida['id_maquina']}")
+        print(f"Modelo: {maquina_escolhida['modelo']}")
+        print(f"SO: {maquina_escolhida['so']}")
+        print(f"Serial: {maquina_escolhida['serial_number']}")
+        print(f"Status: {maquina_escolhida['status']}")
+        print(f"Setor: {maquina_escolhida['setor']}")
+    else:
+        print("Nenhuma máquina encontrada com esse ID.")
+
+    
+
+    cnx.commit()
 
 
-        sql = "SELECT * FROM maquina"
+    # print("\nIniciando monitoramento em tempo real...")
+    # print("Coletando dados de monitoramento...")
+    # while True:
+    #     # Porcentagem de uso da CPU nos últimos 1 segundo
+    #     cpu_porcentagem = psutil.cpu_percent(interval=1)
+    #     # Porcentagem de memória RAM atualmente em uso
+    #     memoria_porcentagem = psutil.virtual_memory().percent
+    #     # Porcentagem de espaço utilizado no disco principal
+    #     disco_percentagem = psutil.disk_usage('/').percent
+    #     # Dados de tráfego de rede  
+    #     rede = psutil.net_io_counters()
+    #     # Quantidade total de bytes enviados pela rede desde a inicialização do sistema
+    #     bytes_enviados = rede.bytes_sent  
+    #     # Quantidade total de bytes recebidos pela rede desde a inicialização do sistema
+    #     bytes_recebidos = rede.bytes_recv  
+    #     # Número total de pacotes enviados pela rede desde a inicialização do sistema
+    #     pacotes_enviados = rede.packets_sent  
+    #     # Número total de pacotes recebidos pela rede desde a inicialização do sistema
+    #     pacotes_recebidos = rede.packets_recv  
+
+        # print("=========================================================================")
+        # print("Dados de monitoramento")
+        # print("Uso da CPU: {:.2f}%".format(cpu_porcentagem))
+        # print("Uso da Memória RAM: {:.2f}%".format(memoria_porcentagem))
+        # print("Uso do Disco: {:.2f}%".format(disco_percentagem))
+        # print("Total de bytes enviados pela rede: {} bytes".format(bytes_enviados))
+        # print("Total de bytes recebidos pela rede: {} bytes".format(bytes_recebidos))
+        # print("Total de pacotes enviados pela rede: {}".format(pacotes_enviados))
+        # print("Total de pacotes recebidos pela rede: {}".format(pacotes_recebidos))
+        # print("=========================================================================")
+
 
 
         # Armazenado no histórico e alertas
-        dataCaptura = datetime.now()
-        valor = 18
-        fkComponete = 1
+        # dataCaptura = datetime.now()
 
         
-        sql = "INSERT INTO historico (data_captura, valor, fk_historico_componente) VALUES (%s,%s,%s)"
-        val = (dataCaptura, valor, fkComponete)
+        # sql = "INSERT INTO historico (data_captura, valor, fk_historico_componente) VALUES (%s,%s,%s)"
+        # val = (dataCaptura, valor, fkComponete)
 
         # if componente < minimo or componente > maximo:
             # sql = "INSERT INTO alerta (data_captura, valor, fk_alerta_componente) VALUES (%s,%s,%s)"
             # val = (dataCaptura, valor, fkComponete)
         
 
-        mycursor.execute(sql,val)
-        cnx.commit()
 
-        time.sleep(1)
+        # time.sleep(1)
 
 def encerrar_servico():
     print("\nServiço encerrado. Obrigado por usar o sistema da InnovaAir.")
