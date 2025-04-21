@@ -1,0 +1,36 @@
+# Ignorar ambiente virtual
+venv/
+
+# Ignorar arquivos de configuração do IDE (Exemplos: PyCharm, VSCode)
+.idea/
+.vscode/
+
+# Arquivos de compilação do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de configuração do sistema (Windows, macOS, etc.)
+.DS_Store
+Thumbs.db
+
+# Arquivos do PyInstaller
+dist/
+build/
+*.spec
+
+# Logs de testes
+*.log
+
+# Arquivos de cobertura de testes
+.coverage
+*.cover
+*.py,cover
+
+# Arquivos de cache do pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Arquivos de configuração do Jupyter
+.ipynb_checkpoints/
