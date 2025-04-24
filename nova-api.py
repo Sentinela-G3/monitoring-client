@@ -4,20 +4,38 @@ import platform
 import time
 import subprocess
 import cpuinfo
+import os
 from datetime import datetime
+from dotenv import load_dotenv 
 
-# Conexão com o banco de dados
+# Carrega variáveis do arquivo .env
+load_dotenv()
+
+AMBIENTE = os.getenv("AMBIENTE", "local")  
+
+# Configurações por ambiente
+CONFIG = {
+    "local": {
+        "host": "127.0.0.1",
+        "port": 3307,
+        "user": "root",
+        "password": "senha123",
+        "database": "Sentinela"
+    },
+    "producao": {
+        "host": "100.29.69.34",
+        "port": 3306,
+        "user": "root",
+        "password": "senha123",
+        "database": "sentinela"
+    }
+}
+
 try:
-    cnx = mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="senha123",
-        database="Sentinela",
-        port=3307
-    )
-    print("Conexão com o banco de dados realizada com sucesso.")
+    cnx = mysql.connector.connect(**CONFIG[AMBIENTE])
+    print(f"Conexão com o banco de dados ({AMBIENTE}) realizada com sucesso.")
 except mysql.connector.Error as err:
-    print(f"Erro na conexão com o banco de dados: {err}")
+    print(f"Erro na conexão: {err}")
     exit()
 
 mycursor = cnx.cursor(dictionary=True)
