@@ -82,7 +82,7 @@ elif sistema_operacional == "Linux":
     output = subprocess.check_output("sudo dmidecode -s system-serial-number", shell=True).decode().strip()
     serial_number = output
 elif sistema_operacional == "Darwin":
-    output = subprocess.check_output("system_profiler SPHardwareDataType | grep 'Serial Number'").decode().split(":")
+    output = subprocess.check_output("system_profiler SPHardwareDataType | grep 'Serial Number'", shell=True).decode().split(":")
     serial_number = output[1].strip()
 else:
     serial_number = "Desconhecido"
