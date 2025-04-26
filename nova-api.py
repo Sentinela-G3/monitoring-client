@@ -21,14 +21,16 @@ CONFIG = {
         "port": 3307,
         "user": "root",
         "password": "senha123",
-        "database": "Sentinela"
+        "database": "Sentinela",
+        "local_web_app": "127.0.0.1"
     },
     "producao": {
         "host": "100.29.69.34",
         "port": 3306,
         "user": "root",
         "password": "senha123",
-        "database": "sentinela"
+        "database": "sentinela",
+        "local_web_app": "18.208.5.45"
     }
 }
 
