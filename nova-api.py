@@ -371,7 +371,7 @@ def monitoramento_em_tempo_real(id_maquina):
                         }
 
                     try:
-                        response = requests.post(f"http://localhost:3333/medidas/{id_maquina}", json=payload)
+                        response = requests.post(f"http://{CONFIG[AMBIENTE]['local_web_app']}:3333/medidas/{id_maquina}", json=payload)
                         if response.status_code == 200:
                             print(f"Dado enviado para a API: {payload}")
                         else:
