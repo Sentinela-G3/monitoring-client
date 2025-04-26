@@ -35,7 +35,8 @@ CONFIG = {
 }
 
 try:
-    cnx = mysql.connector.connect(**CONFIG[AMBIENTE])
+    config_db = {key: CONFIG[AMBIENTE][key] for key in ("host", "user", "password", "database")}
+    cnx = mysql.connector.connect(**config_db)
     print(f"Conexão com o banco de dados ({AMBIENTE}) realizada com sucesso.")
 except mysql.connector.Error as err:
     print(f"Erro na conexão: {err}")
