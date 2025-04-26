@@ -55,13 +55,35 @@ sistema_detalhado = platform.platform()
 
 # Obtenção do número de série dependendo do sistema operacional
 if sistema_operacional == "Windows":
-    output = subprocess.check_output("wmic bios get serialnumber").decode().split("\n")
-    serial_number = output[1].strip()
+    serial_sources = [
+        "wmic bios get serialnumber",
+        "wmic csproduct get identifyingnumber",
+        "powershell -Command \"Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber\"",
+        "powershell -Command \"Get-CimInstance Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID\""
+    ]
+    
+    serial_number = "Desconhecido"
+    
+    for cmd in serial_sources:
+        try:
+            output = subprocess.check_output(cmd, shell=True).decode().strip()
+            lines = [line.strip() for line in output.split('\n') if line.strip()]
+            
+            if len(lines) > 1:
+                value = lines[1]
+            else:  # 
+                value = lines[0] if lines else ""
+                
+            if value and value != "To Be Filled By O.E.M.":
+                serial_number = value
+                break
+        except:
+            continue
 elif sistema_operacional == "Linux":
     output = subprocess.check_output("sudo dmidecode -s system-serial-number", shell=True).decode().strip()
     serial_number = output
 elif sistema_operacional == "Darwin":
-    output = subprocess.check_output("system_profiler SPHardwareDataType | grep 'Serial Number'").decode().split(":")
+    output = subprocess.check_output("system_profiler SPHardwareDataType | grep 'Serial Number'", shell=True).decode().split(":")
     serial_number = output[1].strip()
 else:
     serial_number = "Desconhecido"
