@@ -7,6 +7,7 @@ import cpuinfo
 import os
 from datetime import datetime
 from dotenv import load_dotenv 
+import requests
 
 # Carrega variáveis do arquivo .env
 load_dotenv()
@@ -336,12 +337,22 @@ def monitoramento_em_tempo_real(id_maquina):
                     
                     # Inserir no histórico
                     if valor is not None:
-                        sql_historico = """
-                        INSERT INTO historico (data_captura, valor, fk_historico_componente)
-                        VALUES (%s, %s, %s)
-                        """
-                        val_historico = (timestamp, valor, metrica['id_componente'])
-                        mycursor.execute(sql_historico, val_historico)
+                        payload = {
+                            "timestamp": timestamp.isoformat(),
+                            "tipo": metrica['tipo'],
+                            "valor": valor,
+                            "unidade": unidade,
+                            "serial_number": serial_number
+                        }
+
+                    try:
+                        response = requests.post(f"http://localhost:3333/medidas/{id_maquina}", json=payload)
+                        if response.status_code == 200:
+                            print(f"Dado enviado para a API: {payload}")
+                        else:
+                            print(f"❌ Erro ao enviar para API: {response.status_code} - {response.text}")
+                    except Exception as e:
+                        print(f"❌ Erro de conexão ao enviar para API: {str(e)}")
                     
                 except Exception as e:
                     print(f"Erro ao capturar {metrica['tipo']}: {str(e)}")
