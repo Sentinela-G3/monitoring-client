@@ -15,9 +15,13 @@ load_dotenv()
 
 AMBIENTE = os.getenv("AMBIENTE", "local")  
 
-jira_url = os.getenv('jira_url')
-username = os.getenv('username')
-api_token = os.getenv('api_token')
+# jira_url = os.getenv('jira_url')
+# username = os.getenv('username')
+# api_token = os.getenv('api_token')
+
+jira_url = 'https://sentinelacomvoce.atlassian.net'
+username = 'henrique.barros@sptech.school'
+# api_token = ''
 
 jira = JIRA(server=jira_url, basic_auth=(username, api_token))
 
@@ -314,15 +318,16 @@ def monitoramento_em_tempo_real(id_maquina):
     print("Métricas sendo monitoradas:")
     for metrica in metricas:
         print(f"- {metrica['tipo']} (ID: {metrica['id_componente']})")
-    print_linha()
-    print("Pressione Ctrl+C para parar o monitoramento...")
-    print_linha()
-    
+        print_linha()
+        print("Pressione Ctrl+C para parar o monitoramento...")
+        print_linha()
+        hora_desativacao = None
+        alerta_bloqueado = False;
+
     try:
         while True:
             timestamp = datetime.now()
             dados_monitoramento = []
-            alerta_bloqueado = False;
 
             for metrica in metricas:
                 valor = None
@@ -332,7 +337,7 @@ def monitoramento_em_tempo_real(id_maquina):
                     if metrica['tipo'] == 'cpu_percent':
                         valor = psutil.cpu_percent(interval=1)
                         unidade = "%"
-                        if valor >= 10.0:
+                        if valor >=80.0:
                             if alerta_bloqueado == False:
                                 alerta_bloqueado = True;
                                 hora_ativacao_bloqueio = datetime.now()
@@ -345,6 +350,8 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'customfield_10060': {'value': 'CPU'},
                                                 'customfield_10010': "68",  # requestTypeId específico para o seu caso
                                             })
+                                print("Bloqueado:" + str(alerta_bloqueado))
+                                print("Tempo para desbloquear: " + str(hora_desativacao))
                                 print("Um alerta foi gerado!")
 
                             
@@ -352,7 +359,7 @@ def monitoramento_em_tempo_real(id_maquina):
                     elif metrica['tipo'] == 'disk_percent':
                         valor = psutil.disk_usage('/').percent
                         unidade = "%"
-                        if valor >= 10.0:
+                        if valor >= 80.0:
                             if alerta_bloqueado == False:
                                 alerta_bloqueado = True;
                                 hora_ativacao_bloqueio = datetime.now()
@@ -371,7 +378,7 @@ def monitoramento_em_tempo_real(id_maquina):
                         valor = psutil.virtual_memory().percent
                         unidade = "%"
 
-                        if valor >= 40.0:
+                        if valor >= 90.0:
                             if alerta_bloqueado == False:
                                 alerta_bloqueado = True;
                                 hora_ativacao_bloqueio = datetime.now()
@@ -384,6 +391,8 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'customfield_10060': {'value': 'Memoria'},
                                                 'customfield_10010': "68",  # requestTypeId específico para o seu caso
                                             })
+                                print("Bloqueado:" + alerta_bloqueado)
+                                print("Tempo para desbloquear: " + hora_desativacao)
                                 print("Um alerta foi gerado!")
 
                     elif metrica['tipo'] == 'disk_usage_gb':
@@ -398,6 +407,21 @@ def monitoramento_em_tempo_real(id_maquina):
                         net2 = psutil.net_io_counters().bytes_sent
                         valor = (net2 - net1) / (1024 * 1024)  # MB/s
                         unidade = "MB/s"
+                        if valor == 0.0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta: *Robô sem acesso à internet*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Rede'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
                     elif metrica['tipo'] == 'net_download':
                         net1 = psutil.net_io_counters().bytes_recv
                         time.sleep(1)
@@ -408,15 +432,60 @@ def monitoramento_em_tempo_real(id_maquina):
                         battery = psutil.sensors_battery()
                         valor = battery.percent if battery else 0
                         unidade = "%"
+                        if valor == 0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta: *Robô encontra-se inativo*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Bateria'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
+                        if valor <= 10:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta: *nível de bateria abaixo de 10%. baixa*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Bateria'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
                     elif metrica['tipo'] == 'cpu_freq':
                         valor = psutil.cpu_freq().current / 1000  # GHz
                         unidade = "GHz"
                     elif metrica['tipo'] == 'uptime_hours':
                         valor = round(time.time() - psutil.boot_time(), 2) / 3600  # horas
                         unidade = "horas"
+                        if valor >= 350.0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta: *Robô operando por mais de 14 dias sem interrupção.*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Tempo de Uso'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
 
-                    if datetime.now() > hora_desativacao:      
-                        alerta_bloqueado = False;
+                    if hora_desativacao and datetime.now() > hora_desativacao:
+                        print("Entrei aqui")
+                        alerta_bloqueado = False
 
                     # Inserir no histórico
                     if valor is not None:
@@ -427,7 +496,6 @@ def monitoramento_em_tempo_real(id_maquina):
                             "unidade": unidade,
                             "serial_number": serial_number
                         }
-
                     try:
                         response = requests.post(f"http://{CONFIG[AMBIENTE]['local_web_app']}:3333/medidas/{id_maquina}", json=payload)
                         if response.status_code == 200:
@@ -456,6 +524,7 @@ def monitoramento_em_tempo_real(id_maquina):
             
             cnx.commit()  # Salva todas as inserções no histórico
             time.sleep(2)  # Intervalo entre coletas
+            os.system('cls' if os.name == 'nt' else 'clear')
             
     except KeyboardInterrupt:
         print("\nMonitoramento interrompido pelo usuário.")
