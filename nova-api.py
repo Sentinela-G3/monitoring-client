@@ -5,14 +5,21 @@ import time
 import subprocess
 import cpuinfo
 import os
-from datetime import datetime
+from datetime import datetime , timedelta
 from dotenv import load_dotenv 
 import requests
+from jira import JIRA
 
 # Carrega variáveis do arquivo .env
 load_dotenv()
 
 AMBIENTE = os.getenv("AMBIENTE", "local")  
+
+jira_url = os.getenv('jira_url')
+username = os.getenv('username')
+api_token = os.getenv('api_token')
+
+jira = JIRA(server=jira_url, basic_auth=(username, api_token))
 
 # Configurações por ambiente
 CONFIG = {
@@ -315,22 +322,70 @@ def monitoramento_em_tempo_real(id_maquina):
         while True:
             timestamp = datetime.now()
             dados_monitoramento = []
-            
+            alerta_bloqueado = False;
+
             for metrica in metricas:
                 valor = None
                 unidade = ""
-                
                 try:
                     # Captura dos valores conforme o tipo de métrica
                     if metrica['tipo'] == 'cpu_percent':
                         valor = psutil.cpu_percent(interval=1)
                         unidade = "%"
+                        if valor >= 10.0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado de CPU detectado*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'CPU'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
+                            
+                        
                     elif metrica['tipo'] == 'disk_percent':
                         valor = psutil.disk_usage('/').percent
                         unidade = "%"
+                        if valor >= 10.0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado do Disco detectado*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Disco'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
                     elif metrica['tipo'] == 'ram_percent':
                         valor = psutil.virtual_memory().percent
                         unidade = "%"
+
+                        if valor >= 40.0:
+                            if alerta_bloqueado == False:
+                                alerta_bloqueado = True;
+                                hora_ativacao_bloqueio = datetime.now()
+                                hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
+                                new_issue = jira.create_issue(fields={
+                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
+                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado da Memória detectado*', 
+                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'customfield_10060': {'value': 'Memoria'},
+                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                            })
+                                print("Um alerta foi gerado!")
+
                     elif metrica['tipo'] == 'disk_usage_gb':
                         valor = psutil.disk_usage('/').used / (1024 ** 3)
                         unidade = "GB"
@@ -359,7 +414,10 @@ def monitoramento_em_tempo_real(id_maquina):
                     elif metrica['tipo'] == 'uptime_hours':
                         valor = round(time.time() - psutil.boot_time(), 2) / 3600  # horas
                         unidade = "horas"
-                    
+
+                    if datetime.now() > hora_desativacao:      
+                        alerta_bloqueado = False;
+
                     # Inserir no histórico
                     if valor is not None:
                         payload = {
