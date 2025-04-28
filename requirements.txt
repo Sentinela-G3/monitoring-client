@@ -3,3 +3,4 @@ psutil
 py-cpuinfo
 python-dotenv
 requests
+jira
