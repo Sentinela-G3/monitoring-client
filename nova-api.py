@@ -17,7 +17,7 @@ AMBIENTE = os.getenv("AMBIENTE", "local")
 
 # jira_url = os.getenv('jira_url')
 # username = os.getenv('username')
-# api_token = os.getenv('api_token')
+api_token = os.getenv('api_token')
 
 jira_url = 'https://sentinelacomvoce.atlassian.net'
 username = 'henrique.barros@sptech.school'
@@ -133,9 +133,10 @@ def escolha_usuario():
     escolha = input("""
         1. Consultar informações da máquina
         2. Iniciar monitoramento em tempo real
+        3. Gerenciar métricas
         0. Encerrar o sistema
                     
-    Selecione uma opção (1, 2 ou 0): """).strip()
+    Selecione uma opção (1, 2, 3 ou 0): """).strip()
     return escolha
 
 def verificar_maquina_registrada():
@@ -260,7 +261,6 @@ def cadastrar_metricas_automaticamente(id_maquina):
     
     for metrica in metricas:
         try:
-            # Define valores padrão para cada tipo de métrica
             if metrica['tipo'] in ['cpu_percent', 'disk_percent', 'ram_percent', 'battery_percent']:
                 minimo = 30
                 maximo = 70
@@ -299,6 +299,74 @@ def cadastrar_metricas_automaticamente(id_maquina):
     print_linha()
     print("TODAS AS MÉTRICAS FORAM CADASTRADAS AUTOMATICAMENTE!")
     print_linha()
+
+def gerenciar_metricas(id_maquina):
+    print_linha()
+    print("Gerenciamento de Métricas")
+    print("=" * 73)
+    
+    # Listar todas as métricas cadastradas
+    sql = """
+        SELECT c.id_componente, c.tipo, c.modelo, c.minimo, c.maximo
+        FROM componente c
+        JOIN maquina m ON c.fk_componente_maquina = m.id_maquina
+        WHERE m.id_maquina = %s;
+    """
+
+    mycursor.execute(sql, (id_maquina,))
+    metricas = mycursor.fetchall()
+    
+    if not metricas:
+        print("❌ Nenhuma métrica encontrada para edição.")
+        voltar_ao_menu_ou_encerrar()
+        return
+
+    # Exibir as métricas
+    print("Métricas registradas no sistema:")
+    for metrica in metricas:
+        print(f"ID: {metrica['id_componente']} | Tipo: {metrica['tipo']} | Modelo: {metrica['modelo']} | Mínimo: {metrica['minimo']} | Máximo: {metrica['maximo']}")
+    
+    print_linha()
+    
+    # Solicitar ao usuário qual métrica deseja editar
+    try:
+        id_metrica = int(input("Digite o ID da métrica que deseja editar (ou 0 para voltar): ").strip())
+        if id_metrica == 0:
+            voltar_ao_menu_ou_encerrar()
+            return
+
+        # Verificar se a métrica existe
+        sql = "SELECT id_componente, tipo, modelo, minimo, maximo FROM componente WHERE id_componente = %s"
+        mycursor.execute(sql, (id_metrica,))
+        metrica = mycursor.fetchone()
+
+        if not metrica:
+            print("❌ Métrica não encontrada.")
+            voltar_ao_menu_ou_encerrar()
+            return
+
+        print(f"Editando a métrica: {metrica['tipo']} (Modelo: {metrica['modelo']})")
+        print(f"Mínimo atual: {metrica['minimo']} | Máximo atual: {metrica['maximo']}")
+
+        # Solicitar novos valores para mínimo e máximo
+        minimo = float(input("Digite o novo valor mínimo: ").strip())
+        maximo = float(input("Digite o novo valor máximo: ").strip())
+
+        # Atualizar a métrica no banco de dados
+        sql = """
+        UPDATE componente
+        SET minimo = %s, maximo = %s
+        WHERE id_componente = %s
+        """
+        mycursor.execute(sql, (minimo, maximo, id_metrica))
+        cnx.commit()
+
+        print("✅ Métrica atualizada com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao editar a métrica: {str(e)}")
+
+    # Voltar ou encerrar após edição
+    voltar_ao_menu_ou_encerrar()
 
 def monitoramento_em_tempo_real(id_maquina):
     print_linha()
@@ -567,6 +635,8 @@ def executar():
             menu_informacoes_maquina()
         elif escolha == "2":
             monitoramento_em_tempo_real(id_maquina)
+        elif escolha == "3":
+            gerenciar_metricas(id_maquina)
         elif escolha == "0":
             encerrar_servico()
         else:
