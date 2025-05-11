@@ -46,7 +46,7 @@ CONFIG = {
 }
 
 try:
-    config_db = {key: CONFIG[AMBIENTE][key] for key in ("host", "user", "password", "database")}
+    config_db = {key: CONFIG[AMBIENTE][key] for key in ("host", "user", "password", "database", "port")}
     cnx = mysql.connector.connect(**config_db)
     print(f"Conexão com o banco de dados ({AMBIENTE}) realizada com sucesso.")
 except mysql.connector.Error as err:
@@ -242,7 +242,6 @@ def cadastrar_maquina(id_empresa):
 def cadastrar_metricas_automaticamente(id_maquina):
     processador = platform.processor()
 
-    # Lista de todas as métricas que serão capturadas automaticamente
     metricas = [
         {"tipo": "cpu_percent", "descricao": "Percentual de CPU", "modelo": processador, "unidade": "%"},
         {"tipo": "disk_percent", "descricao": "Percentual de uso de disco", "modelo": "Disco Principal", "unidade": "%"},
@@ -304,8 +303,7 @@ def gerenciar_metricas(id_maquina):
     print_linha()
     print("Gerenciamento de Métricas")
     print("=" * 73)
-    
-    # Listar todas as métricas cadastradas
+
     sql = """
         SELECT c.id_componente, c.tipo, c.modelo, c.minimo, c.maximo
         FROM componente c
@@ -368,12 +366,58 @@ def gerenciar_metricas(id_maquina):
     # Voltar ou encerrar após edição
     voltar_ao_menu_ou_encerrar()
 
+def capturar_processos():
+    processos = []
+    
+    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+        try:
+            processo_info = {
+                'pid': proc.info['pid'],
+                'nome': proc.info['name'],
+                'cpu_percent': proc.info['cpu_percent'],
+                'memory_percent': proc.info['memory_percent'],
+            }
+            processos.append(processo_info)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    
+    return processos
+
+def enviar_processos_para_api(id_maquina, processos):
+    url = f"http://{CONFIG[AMBIENTE]['local_web_app']}:3333/processos/{id_maquina}"
+    
+    payload = {
+        'timestamp': datetime.now().isoformat(),
+        'processos': [
+            {
+                'timestamp': datetime.now().isoformat(),
+                'pid': processo['pid'],
+                'nome': processo['nome'],
+                'cpu_percent': processo['cpu_percent'],
+                'memory_percent': processo['memory_percent']
+            }
+            for processo in processos if processo['nome'] != "System"  # Exclui processos com nome "System"
+        ]
+    }
+    
+
+    print(f"Número de processos capturados: {len(processos)}") 
+    
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("Dados de processos enviados com sucesso!")
+        else:
+            print(f"Erro ao enviar processos para API: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Erro de conexão ao enviar dados para API: {str(e)}")
+
+
 def monitoramento_em_tempo_real(id_maquina):
     print_linha()
     print("Iniciando monitoramento em tempo real...")
     print_linha()
     
-    # Obtém todas as métricas cadastradas para esta máquina
     sql = """
     SELECT c.id_componente, c.tipo 
     FROM componente c
@@ -396,6 +440,8 @@ def monitoramento_em_tempo_real(id_maquina):
         while True:
             timestamp = datetime.now()
             dados_monitoramento = []
+            processos = capturar_processos()
+            enviar_processos_para_api(id_maquina, processos)
 
             for metrica in metricas:
                 valor = None
@@ -411,12 +457,12 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'}, 
+                                                'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado de CPU detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},   
                                                 'customfield_10060': {'value': 'CPU'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68",  
                                             })
                                 print("Bloqueado:" + str(alerta_bloqueado))
                                 print("Tempo para desbloquear: " + str(hora_desativacao))
@@ -433,12 +479,12 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'},  
+                                                'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado do Disco detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},   
                                                 'customfield_10060': {'value': 'Disco'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68",  
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -452,12 +498,12 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'}, 
+                                                'summary': f'Máquina {serial_number}',
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado da Memória detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},  
                                                 'customfield_10060': {'value': 'Memoria'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68",  
                                             })
                                 print("Bloqueado:" + alerta_bloqueado)
                                 print("Tempo para desbloquear: " + hora_desativacao)
@@ -473,7 +519,7 @@ def monitoramento_em_tempo_real(id_maquina):
                         net1 = psutil.net_io_counters().bytes_sent
                         time.sleep(1)
                         net2 = psutil.net_io_counters().bytes_sent
-                        valor = (net2 - net1) / (1024 * 1024)  # MB/s
+                        valor = (net2 - net1) / (1024 * 1024) 
                         unidade = "MB/s"
                         if valor == 0.0:
                             if alerta_bloqueado == False:
@@ -481,12 +527,12 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'},
+                                                'summary': f'Máquina {serial_number}',  
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô sem acesso à internet*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},   
                                                 'customfield_10060': {'value': 'Rede'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68", 
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -494,7 +540,7 @@ def monitoramento_em_tempo_real(id_maquina):
                         net1 = psutil.net_io_counters().bytes_recv
                         time.sleep(1)
                         net2 = psutil.net_io_counters().bytes_recv
-                        valor = (net2 - net1) / (1024 * 1024)  # MB/s
+                        valor = (net2 - net1) / (1024 * 1024)  
                         unidade = "MB/s"
                     elif metrica['tipo'] == 'battery_percent':
                         battery = psutil.sensors_battery()
@@ -506,12 +552,12 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'}, 
+                                                'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô encontra-se inativo*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},  
                                                 'customfield_10060': {'value': 'Bateria'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68",  
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -521,20 +567,20 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'}, 
+                                                'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta: *nível de bateria abaixo de 10%. baixa*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},  
                                                 'customfield_10060': {'value': 'Bateria'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68",  
                                             })
                                 print("Um alerta foi gerado!")
 
                     elif metrica['tipo'] == 'cpu_freq':
-                        valor = psutil.cpu_freq().current / 1000  # GHz
+                        valor = psutil.cpu_freq().current / 1000 
                         unidade = "GHz"
                     elif metrica['tipo'] == 'uptime_hours':
-                        valor = round(time.time() - psutil.boot_time(), 2) / 3600  # horas
+                        valor = round(time.time() - psutil.boot_time(), 2) / 3600  
                         unidade = "horas"
                         if valor >= 350.0:
                             if alerta_bloqueado == False:
@@ -542,17 +588,16 @@ def monitoramento_em_tempo_real(id_maquina):
                                 hora_ativacao_bloqueio = datetime.now()
                                 hora_desativacao = hora_ativacao_bloqueio + timedelta(minutes=5)
                                 new_issue = jira.create_issue(fields={
-                                                'project': {'key': 'SUPSEN'},  # Chave do projeto
-                                                'summary': f'Máquina {serial_number}',  # Resumo do ticket
+                                                'project': {'key': 'SUPSEN'}, 
+                                                'summary': f'Máquina {serial_number}',  
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô operando por mais de 14 dias sem interrupção.*', 
-                                                'issuetype': {'name': '[System] Incident'},   # Descrição do ticket
+                                                'issuetype': {'name': '[System] Incident'},  
                                                 'customfield_10060': {'value': 'Tempo de Uso'},
-                                                'customfield_10010': "68",  # requestTypeId específico para o seu caso
+                                                'customfield_10010': "68", 
                                             })
                                 print("Um alerta foi gerado!")
 
                     if hora_desativacao and datetime.now() > hora_desativacao:
-                        print("Entrei aqui")
                         alerta_bloqueado = False
 
                     # Inserir no histórico
@@ -594,19 +639,21 @@ def monitoramento_em_tempo_real(id_maquina):
                     mycursor.execute(sql_historico, val_historico)
                     
                 cnx.commit()
+
+              
             
-            # Exibir os dados coletados
+          
             print(f"\n{timestamp.strftime('%Y-%m-%d %H:%M:%S')} - Status do Sistema:")
             for dado in dados_monitoramento:
                 print(f"{dado['tipo']}: {dado['valor']:.2f}{dado['unidade']}")
             
-            cnx.commit()  # Salva todas as inserções no histórico
-            time.sleep(2)  # Intervalo entre coletas
+            cnx.commit()  
+            time.sleep(2)  
             os.system('cls' if os.name == 'nt' else 'clear')
             
     except KeyboardInterrupt:
         print("\nMonitoramento interrompido pelo usuário.")
-        cnx.commit()  # Garante que os últimos dados sejam salvos
+        cnx.commit()
         if voltar_ao_menu_ou_encerrar():
             return
         else:
@@ -615,9 +662,9 @@ def monitoramento_em_tempo_real(id_maquina):
 def executar():
     global id_empresa
     
-    # Verifica se a máquina já está registrada
+    
     if not verificar_maquina_registrada():
-        # Se não estiver registrada, pede login
+      
         if not fazer_login():
             encerrar_servico()
     
