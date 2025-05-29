@@ -21,7 +21,7 @@ api_token = os.getenv('api_token')
 
 jira_url = 'https://sentinelacomvc.atlassian.net/'
 username = 'henrique_ab8@hotmail.com'
-api_token = ''
+api_token = 'PEGAR TOKEN NO ARQUIVO .ENV, TIRAR OS * E O TEXTO ENTRE OS *, DEPOIS COLA O TOKEN AQUI'
 
 
 jira = JIRA(server=jira_url, basic_auth=(username, api_token))
@@ -33,7 +33,7 @@ CONFIG = {
         "port": 3306,
         "user": "root",
         "password": "senha123",
-        "database": "sentinela",
+        "database": "Sentinela",
         "local_web_app": "127.0.0.1"
     },
     "producao": {
@@ -41,7 +41,7 @@ CONFIG = {
         "port": 3306,
         "user": "root",
         "password": "senha123",
-        "database": "sentinela",
+        "database": "Sentinela",
         "local_web_app": "18.208.5.45"
     }
 }
