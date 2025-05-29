@@ -19,9 +19,10 @@ AMBIENTE = os.getenv("AMBIENTE", "local")
 # username = os.getenv('username')
 api_token = os.getenv('api_token')
 
-jira_url = 'https://sentinelacomvoce.atlassian.net'
-username = 'henrique.barros@sptech.school'
-# api_token = ''
+jira_url = 'https://sentinelacomvc.atlassian.net/'
+username = 'henrique_ab8@hotmail.com'
+api_token = ''
+
 
 jira = JIRA(server=jira_url, basic_auth=(username, api_token))
 
@@ -460,9 +461,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'}, 
                                                 'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado de CPU detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},   
-                                                'customfield_10060': {'value': 'CPU'},
-                                                'customfield_10010': "68",  
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'CPU'},
+                                                'customfield_10059': {'value': 'Crítico'},  
+                                                'customfield_10010': "5",  
                                             })
                                 print("Bloqueado:" + str(alerta_bloqueado))
                                 print("Tempo para desbloquear: " + str(hora_desativacao))
@@ -482,9 +484,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'},  
                                                 'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado do Disco detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},   
-                                                'customfield_10060': {'value': 'Disco'},
-                                                'customfield_10010': "68",  
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Disco'},
+                                                'customfield_10059': {'value': 'Leve'},  
+                                                'customfield_10010': "5", 
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -501,9 +504,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'}, 
                                                 'summary': f'Máquina {serial_number}',
                                                 'description': f'*Máquina {serial_number}* – Alerta de *uso maior do que o programado da Memória detectado*', 
-                                                'issuetype': {'name': '[System] Incident'},  
-                                                'customfield_10060': {'value': 'Memoria'},
-                                                'customfield_10010': "68",  
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Memória'},
+                                                'customfield_10059': {'value': 'Crítico'},  
+                                                'customfield_10010': "5",  
                                             })
                                 print("Bloqueado:" + alerta_bloqueado)
                                 print("Tempo para desbloquear: " + hora_desativacao)
@@ -530,9 +534,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'},
                                                 'summary': f'Máquina {serial_number}',  
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô sem acesso à internet*', 
-                                                'issuetype': {'name': '[System] Incident'},   
-                                                'customfield_10060': {'value': 'Rede'},
-                                                'customfield_10010': "68", 
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Rede'},
+                                                'customfield_10059': {'value': 'Grave'},  
+                                                'customfield_10010': "5", 
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -555,9 +560,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'}, 
                                                 'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô encontra-se inativo*', 
-                                                'issuetype': {'name': '[System] Incident'},  
-                                                'customfield_10060': {'value': 'Bateria'},
-                                                'customfield_10010': "68",  
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Bateria'},
+                                                'customfield_10059': {'value': 'Leve'},  
+                                                'customfield_10010': "5",  
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -570,9 +576,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'}, 
                                                 'summary': f'Máquina {serial_number}', 
                                                 'description': f'*Máquina {serial_number}* – Alerta: *nível de bateria abaixo de 10%. baixa*', 
-                                                'issuetype': {'name': '[System] Incident'},  
-                                                'customfield_10060': {'value': 'Bateria'},
-                                                'customfield_10010': "68",  
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Bateria'},
+                                                'customfield_10059': {'value': 'Leve'},  
+                                                'customfield_10010': "5",  
                                             })
                                 print("Um alerta foi gerado!")
 
@@ -591,9 +598,10 @@ def monitoramento_em_tempo_real(id_maquina):
                                                 'project': {'key': 'SUPSEN'}, 
                                                 'summary': f'Máquina {serial_number}',  
                                                 'description': f'*Máquina {serial_number}* – Alerta: *Robô operando por mais de 14 dias sem interrupção.*', 
-                                                'issuetype': {'name': '[System] Incident'},  
-                                                'customfield_10060': {'value': 'Tempo de Uso'},
-                                                'customfield_10010': "68", 
+                                                'issuetype': {'name': 'Alertas'},   
+                                                'customfield_10058': {'value': 'Tempo de Uso'},
+                                                'customfield_10059': {'value': 'Leve'},  
+                                                'customfield_10010': "5", 
                                             })
                                 print("Um alerta foi gerado!")
 
