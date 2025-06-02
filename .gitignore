@@ -34,3 +34,5 @@ pip-delete-this-directory.txt
 
 # Arquivos de configuração do Jupyter
 .ipynb_checkpoints/
+
+.env
