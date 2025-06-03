@@ -6,7 +6,8 @@ import subprocess
 import cpuinfo
 import os
 import re 
-from datetime import datetime, timedelta
+from datetime import timezone, datetime
+from datetime import timedelta
 from dotenv import load_dotenv
 import requests
 from jira import JIRA
@@ -23,6 +24,7 @@ JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_PROJECT_KEY = 'SUPSEN'
 JIRA_ISSUE_TYPE_ALERT = 'Alertas'
 JIRA_CUSTOM_FIELD_COMPONENT_TYPE = 'customfield_10058'
+JIRA_CUSTOM_FIELD_HORA_ABERTURA= 'customfield_10124'
 JIRA_CUSTOM_FIELD_SEVERITY = 'customfield_10059'    
 JIRA_CUSTOM_FIELD_STORY_POINTS = 'customfield_10010' 
 
@@ -58,7 +60,7 @@ JIRA_RECURSO_MAP = {
     "net_usage_percent": "Rede",
     "battery_percent": "Bateria",   
     "cpu_freq_ghz": "CPU",     
-    "uptime_hours": "Tempo de uso"   
+    "uptime_hours": "Tempo de Uso"   
 }
 
 METRIC_THRESHOLDS_FAIXA = {
@@ -505,12 +507,14 @@ def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, desc
         recurso_para_jira = componente_tipo
 
     try:
+        data_hora_atual = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
         issue_dict = {
             'project': {'key': JIRA_PROJECT_KEY},
             'summary': f"Máquina {serial_number}",
             'description': f"{descricao_detalhada}", 
             'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
             JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': recurso_para_jira}, 
+            JIRA_CUSTOM_FIELD_HORA_ABERTURA: data_hora_atual,
             JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade},
             'assignee': None
         }
