@@ -63,31 +63,31 @@ JIRA_RECURSO_MAP = {
 
 METRIC_THRESHOLDS_FAIXA = {
     "cpu_percent": { 
-        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "*Aumento crítico de: {v:.1f}%.*"},
-        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "*Uso de CPU grave: {v:.1f}%.*"},
-        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "*Leve aumento no uso de CPU: {v:.1f}%.*"}
+        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "Aumento crítico de: {v:.1f}%"},
+        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "Uso de CPU grave: {v:.1f}%"},
+        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "Leve aumento no uso de CPU: {v:.1f}%"}
     },
     "ram_percent": {
-        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "*Aumento crítico de RAM: {v:.1f}%.*"},
-        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "*Aumento grade de RAM: {v:.1f}%.*"},
-        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "*Leve aumento no uso da RAM: {v:.1f}%.*"}
+        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "Aumento crítico de RAM: {v:.1f}%"},
+        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "Aumento grave de RAM: {v:.1f}%"},
+        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "Leve aumento no uso da RAM: {v:.1f}%"}
     },
     "disk_percent": { 
-        "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "*Uso de Disco ('/') em {v:.1f}%.*"},
-        "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "*Uso de Disco ('/') em {v:.1f}.*"}
+        "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "Uso de Disco ('/') em {v:.1f}%"},
+        "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "Uso de Disco ('/') em {v:.1f}"}
     },
     "net_usage_percent": {
-        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "*Aumento crítico no uso do link ({v:.1f}%).*"},
-        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "*Aumento grave no uso do link ({v:.1f}%).*"},
-        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "*Leve aumento no uso do link ({v:.1f}%).*"}
+        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "Aumento crítico no uso do link ({v:.1f}%)"},
+        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "Aumento grave no uso do link ({v:.1f}%)"},
+        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "Leve aumento no uso do link ({v:.1f}%)"}
     }
 }
 
 SPECIFIC_ALERT_MESSAGES = {
-    "battery_grave_0_percent":  {"sum": "Bateria Crítica (0%)", "desc": "*Nível de bateria em {v:.0f}%. Robô pode estar inativo.*", "jira_sev": "Grave"},
-    "battery_leve_low":         {"sum": "Bateria Baixa",        "desc": "*Nível de bateria abaixo de {v:.0f}%.*", "jira_sev": "Leve"},
-    "net_upload_no_connection": {"sum": "Rede - Sem Upload",    "desc": "*Velocidade de upload ({v:.2f} Mbps) próxima de zero. Possível problema de rede.*", "jira_sev": "Grave"},
-    "uptime_high":              {"sum": "Sistema - Uptime Elevado", "desc": "*Robô operando por {v:.1f} horas sem interrupção.*", "jira_sev": "Leve"}
+    "battery_grave_0_percent":  {"sum": "Bateria Crítica (0%)", "desc": "Nível de bateria em {v:.0f}%. Robô pode estar inativo*", "jira_sev": "Grave"},
+    "battery_leve_low":         {"sum": "Bateria Baixa",        "desc": "Nível de bateria abaixo de {v:.0f}%", "jira_sev": "Leve"},
+    "net_upload_no_connection": {"sum": "Rede - Sem Upload",    "desc": "Velocidade de upload ({v:.2f} Mbps) próxima de zero. Possível problema de rede", "jira_sev": "Grave"},
+    "uptime_high":              {"sum": "Sistema - Uptime Elevado", "desc": "Robô operando por {v:.1f} horas sem interrupção*", "jira_sev": "Leve"}
 }
 
 # --- Configuração do Jira ---
