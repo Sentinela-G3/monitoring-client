@@ -508,10 +508,11 @@ def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, desc
         issue_dict = {
             'project': {'key': JIRA_PROJECT_KEY},
             'summary': f"Máquina {serial_number}",
-            'description': f"*Máquina {serial_number}* – {descricao_detalhada}", 
+            'description': f"{descricao_detalhada}", 
             'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
             JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': recurso_para_jira}, 
-            JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade}
+            JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade},
+            'assignee': None
         }
         if JIRA_CUSTOM_FIELD_STORY_POINTS: 
             issue_dict[JIRA_CUSTOM_FIELD_STORY_POINTS] = "5"
