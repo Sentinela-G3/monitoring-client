@@ -63,23 +63,23 @@ JIRA_RECURSO_MAP = {
 
 METRIC_THRESHOLDS_FAIXA = {
     "cpu_percent": { 
-        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "*Uso de CPU em {v:.1f}%.*"},
-        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "*Uso de CPU em {v:.1f}%.*"},
-        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "*Uso de CPU em {v:.1f}%.*"}
+        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "*Aumento crítico de: {v:.1f}%.*"},
+        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "*Uso de CPU grave: {v:.1f}%.*"},
+        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "*Leve aumento no uso de CPU: {v:.1f}%.*"}
     },
     "ram_percent": {
-        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "*Uso de RAM em {v:.1f}%.*"},
-        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "*Uso de RAM em {v:.1f}%.*"},
-        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "*Uso de RAM em {v:.1f}%.*"}
+        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "*Aumento crítico de RAM: {v:.1f}%.*"},
+        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "*Aumento grade de RAM: {v:.1f}%.*"},
+        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "*Leve aumento no uso da RAM: {v:.1f}%.*"}
     },
     "disk_percent": { 
         "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "*Uso de Disco ('/') em {v:.1f}%.*"},
         "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "*Uso de Disco ('/') em {v:.1f}.*"}
     },
     "net_usage_percent": {
-        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "*Uso do link ({v:.1f}%).*"},
-        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "*Uso do link ({v:.1f}%).*"},
-        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "*Uso do link ({v:.1f}%).*"}
+        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "*Aumento crítico no uso do link ({v:.1f}%).*"},
+        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "*Aumento grave no uso do link ({v:.1f}%).*"},
+        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "*Leve aumento no uso do link ({v:.1f}%).*"}
     }
 }
 
@@ -274,9 +274,9 @@ def cadastrar_maquina_atual(id_empresa_param):
     except mysql.connector.Error as err: print(f"❌ Erro ao cadastrar máquina: {err}"); return None
 
 def cadastrar_metricas_padrao(id_maquina_param):
-    network_info_initial = get_active_network_link_info(verbose=False) 
+    network_info_initial = get_active_network_link_info(verbose=False)
     modelo_rede_principal = network_info_initial.get('modelo_detalhado', 'Rede (Padrão)')
-    
+
     # A lista metricas_definidas continua igual, pois define os componentes e suas unidades/modelos base
     metricas_definidas = [
         {"tipo": "cpu_percent", "descricao": "Percentual de CPU", "modelo": processador_modelo, "unidade": "%"},
@@ -284,7 +284,7 @@ def cadastrar_metricas_padrao(id_maquina_param):
         {"tipo": "ram_percent", "descricao": "Percentual de uso de RAM", "modelo": "Memória RAM", "unidade": "%"},
         {"tipo": "disk_usage_gb", "descricao": "Uso de Disco em GB", "modelo": "Disco Principal", "unidade": "GB"},
         {"tipo": "ram_usage_gb", "descricao": "Uso de RAM em GB", "modelo": "Memória RAM", "unidade": "GB"},
-        {"tipo": "net_upload", "descricao": "Velocidade de Upload Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"}, 
+        {"tipo": "net_upload", "descricao": "Velocidade de Upload Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "net_download", "descricao": "Velocidade de Download Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "link_speed_mbps", "descricao": "Velocidade do Link de Rede", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "net_usage_percent", "descricao": "Percentual de Uso do Link de Rede", "modelo": modelo_rede_principal, "unidade": "%"},
@@ -293,31 +293,49 @@ def cadastrar_metricas_padrao(id_maquina_param):
         {"tipo": "uptime_hours", "descricao": "Tempo de atividade", "modelo": "Sistema", "unidade": "horas"}
     ]
     print_linha(); print("CADASTRANDO MÉTRICAS PADRÃO E VALORES DE LIMIAR DE ALERTA...")
-    
+
     for metrica_info in metricas_definidas:
         try:
             config_alerta_faixa = METRIC_THRESHOLDS_FAIXA.get(metrica_info['tipo'], {})
-            
-            threshold_leve_val = config_alerta_faixa.get("leve", {}).get("val") 
-            threshold_grave_val = config_alerta_faixa.get("grave", {}).get("val") 
-            threshold_critico_val = config_alerta_faixa.get("critico", {}).get("val") 
 
-            min_default_val = 0
-            max_default_val = 100 
-            if metrica_info['tipo'] in ['net_upload','net_download','link_speed_mbps']:
-                 max_default_val = 1000 
+            threshold_leve_val = config_alerta_faixa.get("leve", {}).get("val")
+            threshold_grave_val = config_alerta_faixa.get("grave", {}).get("val")
+            threshold_critico_val = config_alerta_faixa.get("critico", {}).get("val")
+
+            # --- INÍCIO DA MODIFICAÇÃO PROPOSTA ---
+            if metrica_info['tipo'] == 'battery_percent':
+                if threshold_leve_val is None: 
+                    threshold_leve_val = BATTERY_LOW_THRESHOLD
+                if threshold_grave_val is None: # Associado ao alerta "Grave" do SPECIFIC_ALERT_MESSAGES
+                    threshold_grave_val = BATTERY_CRITICAL_THRESHOLD
+
+            elif metrica_info['tipo'] == 'uptime_hours':
+                if threshold_leve_val is None:
+                    threshold_leve_val = UPTIME_HIGH_THRESHOLD_HOURS
+
+            elif metrica_info['tipo'] == 'net_upload':
+                if threshold_grave_val is None: 
+                    threshold_grave_val = NET_UPLOAD_NO_CONNECTION_THRESHOLD
+                # Não há limiares "leve" ou "critico" definidos por padrão para net_upload (sem conexão) nas constantes globais.
+            # --- FIM DA MODIFICAÇÃO PROPOSTA ---
+
+            # min_default_val e max_default_val não são usados para os thresholds, mas podem ser úteis para outras lógicas
+            # min_default_val = 0
+            # max_default_val = 100
+            # if metrica_info['tipo'] in ['net_upload','net_download','link_speed_mbps']:
+            #      max_default_val = 1000
 
             sql_componente = """
                 INSERT INTO componente (
-                    tipo, modelo, valor, 
+                    tipo, modelo, valor,
                     fk_componente_maquina, unidade_medida,
                     threshold_leve, threshold_grave, threshold_critico
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE 
-                    modelo=VALUES(modelo), 
+                ON DUPLICATE KEY UPDATE
+                    modelo=VALUES(modelo),
                     unidade_medida=VALUES(unidade_medida),
-                    threshold_leve=VALUES(threshold_leve), 
-                    threshold_grave=VALUES(threshold_grave), 
+                    threshold_leve=VALUES(threshold_leve),
+                    threshold_grave=VALUES(threshold_grave),
                     threshold_critico=VALUES(threshold_critico);
             """
             val_componente = (
@@ -326,11 +344,11 @@ def cadastrar_metricas_padrao(id_maquina_param):
                 threshold_leve_val, threshold_grave_val, threshold_critico_val
             )
             mycursor.execute(sql_componente, val_componente)
-            print(f"✅ Componente '{metrica_info['descricao']}' ({metrica_info['tipo']}) configurado.")
+            print(f"✅ Componente '{metrica_info['descricao']}' ({metrica_info['tipo']}) e seus limiares foram configurados/atualizados.")
         except mysql.connector.Error as err:
             print(f"❌ Erro ao processar componente '{metrica_info['descricao']}': {err}")
     cnx.commit()
-    print_linha(); print("TODOS OS COMPONENTES E LIMIARES PADRÃO FORAM CONFIGURADOS!")
+    print_linha(); print("TODOS OS COMPONENTES E LIMIARES PADRÃO (INCLUINDO OS DE ALERTA ESPECÍFICO) FORAM CONFIGURADOS/ATUALIZADOS!")
 # --- Funções de Captura de Velocidade de Link ---
 def get_wifi_link_speed_linux(interface='wlan0'):
     try:
@@ -490,7 +508,7 @@ def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, desc
         issue_dict = {
             'project': {'key': JIRA_PROJECT_KEY},
             'summary': f"Máquina {serial_number}",
-            'description': f"Máquina {serial_number} – {descricao_detalhada}", 
+            'description': f"*Máquina {serial_number}* – {descricao_detalhada}", 
             'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
             JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': recurso_para_jira}, 
             JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade}
