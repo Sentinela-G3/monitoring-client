@@ -63,31 +63,31 @@ JIRA_RECURSO_MAP = {
 
 METRIC_THRESHOLDS_FAIXA = {
     "cpu_percent": { 
-        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "Uso de CPU em {v:.1f}%. Limite crítico ({limiar}%) atingido/excedido."},
-        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "Uso de CPU em {v:.1f}%. Limite grave (75%) atingido/excedido."},
-        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "Uso de CPU em {v:.1f}%. Limite leve (60%) atingido/excedido."}
+        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "*Uso de CPU em {v:.1f}%.*"},
+        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "*Uso de CPU em {v:.1f}%.*"},
+        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "*Uso de CPU em {v:.1f}%.*"}
     },
     "ram_percent": {
-        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "Uso de RAM em {v:.1f}%. Limite crítico ({limiar}%) atingido/excedido."},
-        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "Uso de RAM em {v:.1f}%. Limite grave (85%) atingido/excedido."},
-        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "Uso de RAM em {v:.1f}%. Limite leve (70%) atingido/excedido."}
+        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "*Uso de RAM em {v:.1f}%.*"},
+        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "*Uso de RAM em {v:.1f}%.*"},
+        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "*Uso de RAM em {v:.1f}%.*"}
     },
     "disk_percent": { 
-        "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "Uso de Disco ('/') em {v:.1f}%. Limite grave ({limiar}%) atingido/excedido."},
-        "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "Uso de Disco ('/') em {v:.1f}%. Limite leve (70%) atingido/excedido."}
+        "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "*Uso de Disco ('/') em {v:.1f}%.*"},
+        "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "*Uso de Disco ('/') em {v:.1f}.*"}
     },
     "net_usage_percent": {
-        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "Uso do link ({v:.1f}%). Limite crítico ({limiar}%) atingido/excedido."},
-        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "Uso do link ({v:.1f}%). Limite grave (75%) atingido/excedido."},
-        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "Uso do link ({v:.1f}%). Limite leve (60%) atingido/excedido."}
+        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "*Uso do link ({v:.1f}%).*"},
+        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "*Uso do link ({v:.1f}%).*"},
+        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "*Uso do link ({v:.1f}%).*"}
     }
 }
 
 SPECIFIC_ALERT_MESSAGES = {
-    "battery_grave_0_percent":  {"sum": "Bateria Crítica (0%)", "desc": "Nível de bateria em {v:.0f}%. Robô pode estar inativo.", "jira_sev": "Grave"},
-    "battery_leve_low":         {"sum": "Bateria Baixa",        "desc": "Nível de bateria abaixo de {v:.0f}%.", "jira_sev": "Leve"},
-    "net_upload_no_connection": {"sum": "Rede - Sem Upload",    "desc": "Velocidade de upload ({v:.2f} Mbps) próxima de zero. Possível problema de rede.", "jira_sev": "Grave"},
-    "uptime_high":              {"sum": "Sistema - Uptime Elevado", "desc": "Robô operando por {v:.1f} horas sem interrupção.", "jira_sev": "Leve"}
+    "battery_grave_0_percent":  {"sum": "Bateria Crítica (0%)", "desc": "*Nível de bateria em {v:.0f}%. Robô pode estar inativo.*", "jira_sev": "Grave"},
+    "battery_leve_low":         {"sum": "Bateria Baixa",        "desc": "*Nível de bateria abaixo de {v:.0f}%.*", "jira_sev": "Leve"},
+    "net_upload_no_connection": {"sum": "Rede - Sem Upload",    "desc": "*Velocidade de upload ({v:.2f} Mbps) próxima de zero. Possível problema de rede.*", "jira_sev": "Grave"},
+    "uptime_high":              {"sum": "Sistema - Uptime Elevado", "desc": "*Robô operando por {v:.1f} horas sem interrupção.*", "jira_sev": "Leve"}
 }
 
 # --- Configuração do Jira ---
@@ -489,8 +489,8 @@ def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, desc
     try:
         issue_dict = {
             'project': {'key': JIRA_PROJECT_KEY},
-            'summary': f"Máquina {serial_number}: {resumo_especifico}",
-            'description': f"*Máquina {serial_number}* – {descricao_detalhada}", 
+            'summary': f"Máquina {serial_number}",
+            'description': f"Máquina {serial_number} – {descricao_detalhada}", 
             'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
             JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': recurso_para_jira}, 
             JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade}
