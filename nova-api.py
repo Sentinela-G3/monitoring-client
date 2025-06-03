@@ -15,6 +15,7 @@ import random
 # Carrega variáveis do arquivo .env
 load_dotenv()
 
+# --- Constantes Globais ---
 AMBIENTE = os.getenv("AMBIENTE", "local")
 JIRA_URL = os.getenv('JIRA_URL')
 JIRA_USERNAME = os.getenv('JIRA_USERNAME')
@@ -22,19 +23,72 @@ JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_PROJECT_KEY = 'SUPSEN'
 JIRA_ISSUE_TYPE_ALERT = 'Alertas'
 JIRA_CUSTOM_FIELD_COMPONENT_TYPE = 'customfield_10058'
-JIRA_CUSTOM_FIELD_SEVERITY = 'customfield_10059'
-JIRA_CUSTOM_FIELD_STORY_POINTS = 'customfield_10010'
-CPU_CRITICAL_THRESHOLD = 80.0
-RAM_CRITICAL_THRESHOLD = 90.0
-DISK_HIGH_THRESHOLD = 80.0
-NET_UPLOAD_NO_CONNECTION_THRESHOLD = 0.01
-BATTERY_CRITICAL_THRESHOLD = 0.0
-BATTERY_LOW_THRESHOLD = 10.0
+JIRA_CUSTOM_FIELD_SEVERITY = 'customfield_10059'    
+JIRA_CUSTOM_FIELD_STORY_POINTS = 'customfield_10010' 
+
+# Limiares principais (usados como PADRÕES ou para alertas específicos)
+CPU_CRITICAL_THRESHOLD = 80.0       
+RAM_CRITICAL_THRESHOLD = 90.0      
+DISK_HIGH_THRESHOLD = 80.0       
+NET_UPLOAD_NO_CONNECTION_THRESHOLD = 0.01 
+BATTERY_CRITICAL_THRESHOLD = 0.0   
+BATTERY_LOW_THRESHOLD = 10.0      
 UPTIME_HIGH_THRESHOLD_HOURS = 350.0
 NETWORK_USAGE_HIGH_THRESHOLD = 85.0
+
 ALERT_COOLDOWN_MINUTES = 5
+
 API_PROCESS_ENDPOINT = "/processos/{id_maquina}"
 API_METRIC_ENDPOINT = "/medidas/{id_maquina}"
+
+JIRA_SEVERITY_MAP = {
+    "critico": "Crítico", 
+    "grave": "Grave",     
+    "leve": "Leve"       
+}
+
+JIRA_RECURSO_MAP = {
+    "cpu_percent": "CPU",  
+    "ram_percent": "Memória",
+    "disk_percent": "Disco",     
+    "disk_usage_gb": "Disco",  
+    "net_upload": "Rede",    
+    "net_download": "Rede",
+    "link_speed_mbps": "Rede",
+    "net_usage_percent": "Rede",
+    "battery_percent": "Bateria",   
+    "cpu_freq_ghz": "CPU",     
+    "uptime_hours": "Tempo de uso"   
+}
+
+METRIC_THRESHOLDS_FAIXA = {
+    "cpu_percent": { 
+        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "Uso de CPU em {v:.1f}%. Limite crítico ({limiar}%) atingido/excedido."},
+        "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "Uso de CPU em {v:.1f}%. Limite grave (75%) atingido/excedido."},
+        "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "Uso de CPU em {v:.1f}%. Limite leve (60%) atingido/excedido."}
+    },
+    "ram_percent": {
+        "critico": {"val": RAM_CRITICAL_THRESHOLD, "sum": "RAM - Nível Crítico", "desc": "Uso de RAM em {v:.1f}%. Limite crítico ({limiar}%) atingido/excedido."},
+        "grave":   {"val": 85.0,                     "sum": "RAM - Nível Grave",   "desc": "Uso de RAM em {v:.1f}%. Limite grave (85%) atingido/excedido."},
+        "leve":    {"val": 70.0,                     "sum": "RAM - Nível Leve",    "desc": "Uso de RAM em {v:.1f}%. Limite leve (70%) atingido/excedido."}
+    },
+    "disk_percent": { 
+        "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "Uso de Disco ('/') em {v:.1f}%. Limite grave ({limiar}%) atingido/excedido."},
+        "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "Uso de Disco ('/') em {v:.1f}%. Limite leve (70%) atingido/excedido."}
+    },
+    "net_usage_percent": {
+        "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "Uso do link ({v:.1f}%). Limite crítico ({limiar}%) atingido/excedido."},
+        "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "Uso do link ({v:.1f}%). Limite grave (75%) atingido/excedido."},
+        "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "Uso do link ({v:.1f}%). Limite leve (60%) atingido/excedido."}
+    }
+}
+
+SPECIFIC_ALERT_MESSAGES = {
+    "battery_grave_0_percent":  {"sum": "Bateria Crítica (0%)", "desc": "Nível de bateria em {v:.0f}%. Robô pode estar inativo.", "jira_sev": "Grave"},
+    "battery_leve_low":         {"sum": "Bateria Baixa",        "desc": "Nível de bateria abaixo de {v:.0f}%.", "jira_sev": "Leve"},
+    "net_upload_no_connection": {"sum": "Rede - Sem Upload",    "desc": "Velocidade de upload ({v:.2f} Mbps) próxima de zero. Possível problema de rede.", "jira_sev": "Grave"},
+    "uptime_high":              {"sum": "Sistema - Uptime Elevado", "desc": "Robô operando por {v:.1f} horas sem interrupção.", "jira_sev": "Leve"}
+}
 
 # --- Configuração do Jira ---
 jira_client = None
@@ -42,9 +96,11 @@ if not all([JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN]):
     print("AVISO: Credenciais do Jira não configuradas. Integração desabilitada.")
 else:
     try:
+        print(f"INFO: Tentando conectar ao Jira em {JIRA_URL}...")
         jira_client = JIRA(server=JIRA_URL, basic_auth=(JIRA_USERNAME, JIRA_API_TOKEN))
+        print(f"✅ Conexão com o Jira ({JIRA_URL}) realizada com sucesso.")
     except Exception as e:
-        print(f"Erro ao conectar ao Jira: {e}. Integração desabilitada.")
+        print(f"❌ Erro ao conectar ao Jira: {e}. Integração desabilitada.")
         jira_client = None
 
 # --- Configurações de Ambiente ---
@@ -68,6 +124,7 @@ if not CONFIG[AMBIENTE].get("password") or not CONFIG[AMBIENTE].get("host") or n
     print(f"ERRO: Configurações essenciais de DB ou WebApp para o ambiente '{AMBIENTE}' não encontradas. Verifique .env.")
     exit()
 
+# --- Conexão com o Banco de Dados ---
 cnx = None
 mycursor = None
 try:
@@ -82,7 +139,7 @@ except mysql.connector.Error as err:
     print(f"Erro fatal na conexão com o banco de dados: {err}")
     exit()
 
-
+# --- Coleta de Informações Estáticas do Sistema ---
 sistema_operacional = platform.system()
 processador_modelo = ""
 try:
@@ -99,7 +156,6 @@ versao_sistema = platform.version()
 sistema_detalhado = platform.platform()
 serial_number = "Desconhecido"
 
-# Lógica para obter serial number
 if sistema_operacional == "Windows":
     serial_sources = [
         "wmic bios get serialnumber", "wmic csproduct get identifyingnumber",
@@ -127,50 +183,45 @@ elif sistema_operacional == "Darwin":
         if len(output_sn) > 1: serial_number = output_sn[1].strip()
     except: serial_number = "Desconhecido (Darwin)"
 
-
 # --- Variáveis Globais de Estado ---
 id_empresa_global = None
 alert_cooldown_tracker = {}
 
+# --- Funções Utilitárias ---
 def print_linha(char="=", length=73): print(f"\n{char * length}")
 def encerrar_servico():
     print_linha(); print("\nServiço encerrado.");
     if cnx and cnx.is_connected(): cnx.close()
     exit()
 def voltar_ao_menu_ou_encerrar():
-    print_linha(); escolha = input("Voltar ao menu principal? (S/N): ").strip().lower()
+    print_linha(); escolha = input("Voltar ao menu principal? (S para Sim, outra tecla para encerrar): ").strip().lower()
     return escolha == 's'
+
+# --- Funções de Menu ---
 def menu_informacoes_maquina():
     print_linha()
     print("        INFORMAÇÕES TÉCNICAS DA MÁQUINA        ")
     print_linha("-", 50)
-
     print(f"Modelo do processador: {processador_modelo if processador_modelo else 'N/A'}")
     print(f"Arquitetura do sistema: {arquitetura if arquitetura else 'N/A'}")
-    
     print(f"Sistema operacional: {sistema_operacional if sistema_operacional else 'N/A'}")
     print(f"Versão do sistema: {versao_sistema if versao_sistema else 'N/A'}")
     print(f"Detalhes da plataforma: {sistema_detalhado if sistema_detalhado else 'N/A'}")
-    
     print(f"Número de série da máquina: {serial_number if serial_number else 'N/A'}")
-    
     print(f"Quantidade de núcleos físicos: {nucleos_fisicos if nucleos_fisicos is not None else 'N/A'}")
     print(f"Quantidade de núcleos lógicos: {nucleos_logicos if nucleos_logicos is not None else 'N/A'}")
     if cpu_frequencia_max_ghz is not None and cpu_frequencia_max_ghz > 0:
         print(f"Frequência máxima da CPU: {cpu_frequencia_max_ghz:.2f} GHz")
     else:
         print(f"Frequência máxima da CPU: N/A")
-        
     if memoria_total_gb is not None:
         print(f"Memória RAM total: {memoria_total_gb:.2f} GB")
     else:
         print(f"Memória RAM total: N/A")
-        
     if disco_total_gb is not None:
         print(f"Armazenamento total da partição raiz ('/'): {disco_total_gb:.2f} GB")
     else:
         print(f"Armazenamento total da partição raiz ('/'): N/A")
-
     print_linha("-", 50)
     print("Informações da Conexão de Rede Ativa:")
     try:
@@ -184,12 +235,10 @@ def menu_informacoes_maquina():
             print(f"  Velocidade do Link: N/A")
     except Exception as e_netinfo:
         print(f"  Não foi possível obter informações da rede ativa no momento: {e_netinfo}")
-    
-    if voltar_ao_menu_ou_encerrar(): 
-        return
-    else: 
-        encerrar_servico()
+    if voltar_ao_menu_ou_encerrar(): return
+    else: encerrar_servico()
 
+# --- Funções de Autenticação e Registro ---
 def verificar_maquina_registrada():
     global id_empresa_global; print_linha(); print("🔍 Buscando máquina...");
     sql = "SELECT id_maquina, fk_maquina_empresa FROM maquina WHERE serial_number = %s"
@@ -224,62 +273,65 @@ def cadastrar_maquina_atual(id_empresa_param):
         cadastrar_metricas_padrao(id_maquina_nova); return id_maquina_nova
     except mysql.connector.Error as err: print(f"❌ Erro ao cadastrar máquina: {err}"); return None
 
-
 def cadastrar_metricas_padrao(id_maquina_param):
-    """Cadastra um conjunto padrão de métricas/componentes para uma nova máquina."""
     network_info_initial = get_active_network_link_info(verbose=False) 
-    modelo_rede_principal = f"{network_info_initial.get('type', 'Rede')} ({network_info_initial.get('interface', 'Padrão')})"
-
+    modelo_rede_principal = network_info_initial.get('modelo_detalhado', 'Rede (Padrão)')
+    
+    # A lista metricas_definidas continua igual, pois define os componentes e suas unidades/modelos base
     metricas_definidas = [
         {"tipo": "cpu_percent", "descricao": "Percentual de CPU", "modelo": processador_modelo, "unidade": "%"},
         {"tipo": "disk_percent", "descricao": "Percentual de uso de disco", "modelo": "Disco Principal", "unidade": "%"},
         {"tipo": "ram_percent", "descricao": "Percentual de uso de RAM", "modelo": "Memória RAM", "unidade": "%"},
         {"tipo": "disk_usage_gb", "descricao": "Uso de Disco em GB", "modelo": "Disco Principal", "unidade": "GB"},
         {"tipo": "ram_usage_gb", "descricao": "Uso de RAM em GB", "modelo": "Memória RAM", "unidade": "GB"},
-        
-        # Métricas de rede existentes
         {"tipo": "net_upload", "descricao": "Velocidade de Upload Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"}, 
         {"tipo": "net_download", "descricao": "Velocidade de Download Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"},
-        
         {"tipo": "link_speed_mbps", "descricao": "Velocidade do Link de Rede", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "net_usage_percent", "descricao": "Percentual de Uso do Link de Rede", "modelo": modelo_rede_principal, "unidade": "%"},
-
         {"tipo": "battery_percent", "descricao": "Bateria em uso", "modelo": "Bateria", "unidade": "%"},
         {"tipo": "cpu_freq_ghz", "descricao": "Frequência da CPU", "modelo": processador_modelo, "unidade": "GHz"},
         {"tipo": "uptime_hours", "descricao": "Tempo de atividade", "modelo": "Sistema", "unidade": "horas"}
     ]
-    print_linha()
-    print("CADASTRANDO MÉTRICAS PADRÃO AUTOMATICAMENTE...")
-    for metrica in metricas_definidas:
+    print_linha(); print("CADASTRANDO MÉTRICAS PADRÃO E VALORES DE LIMIAR DE ALERTA...")
+    
+    for metrica_info in metricas_definidas:
         try:
-            minimo, maximo = 0, 100
-            if metrica['tipo'] in ['cpu_percent', 'disk_percent', 'ram_percent', 'battery_percent', 'net_usage_percent']:
-                minimo, maximo = 0, 100 
-                if metrica['tipo'] != 'net_usage_percent' and metrica['tipo'] != 'battery_percent': 
-                     minimo, maximo = 30, 70
-            elif metrica['tipo'] == 'cpu_freq_ghz' and cpu_frequencia_max_ghz > 0:
-                minimo, maximo = round(cpu_frequencia_max_ghz * 0.3, 2), round(cpu_frequencia_max_ghz * 0.8, 2)
-            elif metrica['tipo'] == 'disk_usage_gb' and disco_total_gb > 0:
-                minimo, maximo = round(disco_total_gb * 0.3, 2), round(disco_total_gb * 0.7, 2)
-            elif metrica['tipo'] == 'ram_usage_gb' and memoria_total_gb > 0:
-                minimo, maximo = round(memoria_total_gb * 0.3, 2), round(memoria_total_gb * 0.7, 2)
-            elif metrica['tipo'] in ['net_upload', 'net_download', 'link_speed_mbps']:
-                minimo, maximo = 0, 1000 
+            config_alerta_faixa = METRIC_THRESHOLDS_FAIXA.get(metrica_info['tipo'], {})
             
-            sql = """
-            INSERT INTO componente (tipo, modelo, valor, minimo, maximo, fk_componente_maquina, unidade_medida)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE modelo=VALUES(modelo), minimo=VALUES(minimo), maximo=VALUES(maximo), unidade_medida=VALUES(unidade_medida)
+            threshold_leve_val = config_alerta_faixa.get("leve", {}).get("val") 
+            threshold_grave_val = config_alerta_faixa.get("grave", {}).get("val") 
+            threshold_critico_val = config_alerta_faixa.get("critico", {}).get("val") 
+
+            min_default_val = 0
+            max_default_val = 100 
+            if metrica_info['tipo'] in ['net_upload','net_download','link_speed_mbps']:
+                 max_default_val = 1000 
+
+            sql_componente = """
+                INSERT INTO componente (
+                    tipo, modelo, valor, 
+                    fk_componente_maquina, unidade_medida,
+                    threshold_leve, threshold_grave, threshold_critico
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    modelo=VALUES(modelo), 
+                    unidade_medida=VALUES(unidade_medida),
+                    threshold_leve=VALUES(threshold_leve), 
+                    threshold_grave=VALUES(threshold_grave), 
+                    threshold_critico=VALUES(threshold_critico);
             """
-            val = (metrica['tipo'], metrica['modelo'], 0, minimo, maximo, id_maquina_param, metrica['unidade'])
-            mycursor.execute(sql, val)
-            print(f"✅ Métrica '{metrica['descricao']}' ({metrica['tipo']}) configurada com modelo '{metrica['modelo']}'.")
+            val_componente = (
+                metrica_info['tipo'], metrica_info['modelo'], 0, 
+                id_maquina_param, metrica_info['unidade'],
+                threshold_leve_val, threshold_grave_val, threshold_critico_val
+            )
+            mycursor.execute(sql_componente, val_componente)
+            print(f"✅ Componente '{metrica_info['descricao']}' ({metrica_info['tipo']}) configurado.")
         except mysql.connector.Error as err:
-            print(f"❌ Erro ao cadastrar métrica '{metrica['descricao']}': {err}")
+            print(f"❌ Erro ao processar componente '{metrica_info['descricao']}': {err}")
     cnx.commit()
-    print_linha(); print("TODAS AS MÉTRICAS PADRÃO FORAM CONFIGURADAS!")
-
-
+    print_linha(); print("TODOS OS COMPONENTES E LIMIARES PADRÃO FORAM CONFIGURADOS!")
+# --- Funções de Captura de Velocidade de Link ---
 def get_wifi_link_speed_linux(interface='wlan0'):
     try:
         cmd = f"iw dev {interface} link"; result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
@@ -331,7 +383,7 @@ def get_ethernet_link_speed_windows(adapter_name_hint="Ethernet"):
         output = result.stdout.strip(); lines = output.splitlines()
         if len(lines) > 1:
             for line in lines[1:]:
-                if line.strip().isdigit(): speed_bps = int(line.strip()); return speed_bps / 1000000 # Mbps
+                if line.strip().isdigit(): speed_bps = int(line.strip()); return speed_bps / 1000000 
     except FileNotFoundError: print(f"AVISO: 'wmic' não encontrado para Ethernet em Windows."); return None
     except: return None
     return None
@@ -359,62 +411,44 @@ def get_ethernet_link_speed_macos(interface_port='en0'):
     return None
 
 def get_active_network_link_info(verbose=True):
-    """Tenta detectar a conexão ativa (Wi-Fi ou Ethernet) e retorna sua velocidade e tipo."""
-    link_speed = None
-    connection_type = "Desconhecido"
-    active_interface = "N/A"
-
+    link_speed, connection_type, active_interface = None, "Desconhecido", "N/A"
     if verbose: print("Procurando link Wi-Fi ativo...")
     if sistema_operacional == "Linux":
-        interfaces_wifi_linux = ['wlan0', 'wlp2s0', 'wlp3s0', 'wlp1s0', 'wlp0s20f3']
-        for iface in interfaces_wifi_linux:
+        for iface in ['wlan0', 'wlp2s0', 'wlp3s0', 'wlp1s0', 'wlp0s20f3']:
             speed = get_wifi_link_speed_linux(interface=iface)
-            if speed is not None: active_interface, connection_type, link_speed = iface, "Wi-Fi", speed; break
+            if speed is not None: active_interface,connection_type,link_speed = iface,"Wi-Fi",speed; break
     elif sistema_operacional == "Windows":
         speed = get_wifi_link_speed_windows()
-        if speed is not None: active_interface, connection_type, link_speed = "Wi-Fi Padrão", "Wi-Fi", speed
+        if speed is not None: active_interface,connection_type,link_speed = "Wi-Fi Padrão","Wi-Fi",speed
     elif sistema_operacional == "Darwin":
         speed = get_wifi_link_speed_macos()
-        if speed is not None: active_interface, connection_type, link_speed = "Airport", "Wi-Fi", speed
-    
-    if link_speed is not None and verbose:
-        print(f"Conexão {connection_type} ({active_interface}) encontrada: {link_speed} Mbps")
-    elif verbose:
-        print("Nenhum link Wi-Fi ativo encontrado ou velocidade não obtida. Procurando Ethernet...")
-
-    if link_speed is None: 
+        if speed is not None: active_interface,connection_type,link_speed = "Airport","Wi-Fi",speed
+    if link_speed is not None and verbose: print(f"Conexão {connection_type} ({active_interface}) encontrada: {link_speed} Mbps")
+    elif verbose: print("Nenhum link Wi-Fi. Procurando Ethernet...")
+    if link_speed is None:
         if sistema_operacional == "Linux":
-            interfaces_eth_linux = ['eth0', 'enp2s0', 'enp3s0', 'enp1s0', 'eno1']
-            for iface in interfaces_eth_linux:
+            for iface in ['eth0', 'enp2s0', 'enp3s0', 'enp1s0', 'eno1']:
                 speed = get_ethernet_link_speed_linux(interface=iface)
-                if speed is not None: active_interface, connection_type, link_speed = iface, "Ethernet", speed; break
+                if speed is not None: active_interface,connection_type,link_speed = iface,"Ethernet",speed; break
         elif sistema_operacional == "Windows":
-            ethernet_adapter_hints = ["Ethernet", "Local Area Connection", "Conexão Local"]
-            for hint in ethernet_adapter_hints:
+            for hint in ["Ethernet", "Local Area Connection", "Conexão Local"]:
                 speed = get_ethernet_link_speed_windows(adapter_name_hint=hint)
-                if speed is not None: active_interface, connection_type, link_speed = hint, "Ethernet", speed; break
+                if speed is not None: active_interface,connection_type,link_speed = hint,"Ethernet",speed; break
         elif sistema_operacional == "Darwin":
-            ethernet_ports_macos = ['en0', 'en1', 'en2']
-            for port in ethernet_ports_macos:
+            for port in ['en0', 'en1', 'en2']:
                 speed = get_ethernet_link_speed_macos(interface_port=port)
-                if speed is not None: active_interface, connection_type, link_speed = port, "Ethernet", speed; break
-        
-        if link_speed is not None and verbose:
-            print(f"Conexão {connection_type} ({active_interface}) encontrada: {link_speed} Mbps")
-        elif verbose:
-            print("Nenhum link Ethernet ativo encontrado ou velocidade não obtida.")
-
+                if speed is not None: active_interface,connection_type,link_speed = port,"Ethernet",speed; break
+        if link_speed is not None and verbose: print(f"Conexão {connection_type} ({active_interface}) encontrada: {link_speed} Mbps")
+        elif verbose: print("Nenhum link Ethernet.")
     if link_speed is None and sistema_operacional == "Linux" and verbose:
-        custom_interface = input("Interface Wi-Fi customizada (ou Enter para pular): ").strip()
+        custom_interface = input("Interface Wi-Fi custom (ou Enter): ").strip()
         if custom_interface:
             speed = get_wifi_link_speed_linux(interface=custom_interface)
             if speed is not None: active_interface,connection_type,link_speed = custom_interface,"Wi-Fi Custom",speed
-    
-    if link_speed is None and verbose:
-         print("Não foi possível determinar a velocidade do link de rede ativa.")
+    if link_speed is None and verbose: print("Não foi possível determinar velocidade do link.")
+    return {'speed_mbps':link_speed,'type':connection_type,'interface':active_interface,'modelo_detalhado':f"{connection_type} ({active_interface})"}
 
-    return {'speed_mbps': link_speed, 'type': connection_type, 'interface': active_interface, 'modelo_detalhado': f"{connection_type} ({active_interface})"}
-
+# --- Funções de Monitoramento (Core) ---
 def capturar_processos_sistema():
     processos_lista = []
     for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
@@ -440,26 +474,74 @@ def enviar_dados_api(endpoint_path_template, id_maquina_param, payload_data, des
     except Exception as e: print(f"❌ Erro inesperado API {description} ({url}): {str(e)}")
 
 def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, descricao_detalhada):
-    if not jira_client: print(f"AVISO Jira: Não configurado. Alerta '{componente_tipo}' não enviado."); return False
-    try:
-        issue_dict = {'project': {'key': JIRA_PROJECT_KEY}, 'summary': f"Máquina {serial_number}: {resumo_especifico}",
-                      'description': f"*Máquina {serial_number}* – {descricao_detalhada}", 
-                      'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
-                      JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': componente_tipo},
-                      JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade}}
-        if JIRA_CUSTOM_FIELD_STORY_POINTS: issue_dict[JIRA_CUSTOM_FIELD_STORY_POINTS] = "5" # Exemplo
-        new_issue = jira_client.create_issue(fields=issue_dict)
-        print(f"✅ Alerta Jira '{componente_tipo}': {new_issue.key}"); return True
-    except Exception as e: print(f"❌ Erro criar alerta Jira '{componente_tipo}': {e}"); return False
+    if not jira_client: 
+        print(f"AVISO Jira: Não configurado. Alerta para '{componente_tipo}' não enviado.")
+        return False
 
-def verificar_e_disparar_alerta(metrica_tipo, valor_atual, limiar, severidade, resumo_alerta, desc_alerta):
-    global alert_cooldown_tracker; agora = datetime.now()
-    if valor_atual >= limiar:
-        ultimo_alerta = alert_cooldown_tracker.get(metrica_tipo)
-        if not ultimo_alerta or agora > ultimo_alerta:
-            if criar_alerta_jira_issue(metrica_tipo, severidade, resumo_alerta, desc_alerta):
-                alert_cooldown_tracker[metrica_tipo] = agora + timedelta(minutes=ALERT_COOLDOWN_MINUTES)
-                print(f"ℹ️ Alerta {metrica_tipo} ativado. Cooldown até {alert_cooldown_tracker[metrica_tipo]:%H:%M:%S}")
+    # --- INÍCIO DA MODIFICAÇÃO ---
+    recurso_para_jira = JIRA_RECURSO_MAP.get(componente_tipo)
+
+    if not recurso_para_jira:
+        print(f"AVISO Jira: Mapeamento para 'Recurso' não encontrado para tipo_metrica '{componente_tipo}'. "
+              f"Verifique JIRA_RECURSO_MAP. Enviando '{componente_tipo}' como fallback (pode falhar).")
+        recurso_para_jira = componente_tipo
+
+    try:
+        issue_dict = {
+            'project': {'key': JIRA_PROJECT_KEY},
+            'summary': f"Máquina {serial_number}: {resumo_especifico}",
+            'description': f"*Máquina {serial_number}* – {descricao_detalhada}", 
+            'issuetype': {'name': JIRA_ISSUE_TYPE_ALERT},
+            JIRA_CUSTOM_FIELD_COMPONENT_TYPE: {'value': recurso_para_jira}, 
+            JIRA_CUSTOM_FIELD_SEVERITY: {'value': severidade}
+        }
+        if JIRA_CUSTOM_FIELD_STORY_POINTS: 
+            issue_dict[JIRA_CUSTOM_FIELD_STORY_POINTS] = "5"
+
+        new_issue = jira_client.create_issue(fields=issue_dict)
+        print(f"✅ Alerta Jira '{componente_tipo}' (Recurso: {recurso_para_jira}, Severidade: {severidade}): {new_issue.key}")
+        return True
+    except Exception as e: 
+        print(f"❌ Erro criar alerta Jira '{componente_tipo}': {e}")
+        if hasattr(e, 'text'):
+             print(f"    Detalhes do erro Jira: {e.text}")
+        return False
+
+def verificar_e_disparar_alerta_faixa(dados_componente, valor_atual):
+    global alert_cooldown_tracker
+    agora = datetime.now()
+    
+    tipo_metrica = dados_componente['tipo']
+
+    ultimo_alerta_timestamp = alert_cooldown_tracker.get(tipo_metrica)
+    if ultimo_alerta_timestamp and agora <= ultimo_alerta_timestamp:
+        return 
+
+    th_critico = dados_componente.get('threshold_critico')
+    th_grave = dados_componente.get('threshold_grave')
+    th_leve = dados_componente.get('threshold_leve')
+
+    nivel_alerta_acionado = None
+    limiar_acionado_regra = None 
+    if th_critico is not None and valor_atual >= th_critico:
+        nivel_alerta_acionado = "critico"; limiar_acionado_regra = th_critico
+    elif th_grave is not None and valor_atual >= th_grave:
+        nivel_alerta_acionado = "grave"; limiar_acionado_regra = th_grave
+    elif th_leve is not None and valor_atual >= th_leve:
+        nivel_alerta_acionado = "leve"; limiar_acionado_regra = th_leve
+    
+    if nivel_alerta_acionado:
+        templates_alerta = METRIC_THRESHOLDS_FAIXA.get(tipo_metrica, {}).get(nivel_alerta_acionado)
+        if templates_alerta:
+            resumo_jira = templates_alerta["sum"]
+            descricao_jira = templates_alerta["desc"].format(v=valor_atual, limiar=limiar_acionado_regra)
+            severidade_jira = JIRA_SEVERITY_MAP.get(nivel_alerta_acionado, "Leve")
+
+            if criar_alerta_jira_issue(tipo_metrica, severidade_jira, resumo_jira, descricao_jira):
+                alert_cooldown_tracker[tipo_metrica] = agora + timedelta(minutes=ALERT_COOLDOWN_MINUTES)
+                print(f"ℹ️ Alerta Nível '{nivel_alerta_acionado.capitalize()}' para {tipo_metrica} (valor: {valor_atual:.2f}) ativado. Cooldown até {alert_cooldown_tracker[tipo_metrica]:%H:%M:%S}")
+        else:
+            print(f"AVISO: Templates de mensagem não encontrados em METRIC_THRESHOLDS_FAIXA para {tipo_metrica} nível {nivel_alerta_acionado}.")
 
 def salvar_metrica_historico(id_componente_db, valor_capturado, timestamp_captura):
     try:
@@ -468,211 +550,173 @@ def salvar_metrica_historico(id_componente_db, valor_capturado, timestamp_captur
     except Exception as e: print(f"❌ Erro salvar histórico comp ID {id_componente_db}: {e}")
 
 def monitoramento_em_tempo_real(id_maquina_param):
-    global alert_cooldown_tracker
-    alert_cooldown_tracker = {}
-
-    print_linha()
-    print(f"Iniciando monitoramento: Máquina ID: {id_maquina_param} (Serial: {serial_number})")
-    
+    global alert_cooldown_tracker; alert_cooldown_tracker = {}
+    print_linha(); print(f"Iniciando monitoramento: Máquina ID: {id_maquina_param} (Serial: {serial_number})")
     network_link_info = get_active_network_link_info(verbose=True)
     current_link_speed_mbps = network_link_info.get('speed_mbps')
     current_connection_type = network_link_info.get('type', "Desconhecido")
     current_active_interface = network_link_info.get('interface', "N/A")
+    print(f"Monitorando link: Tipo='{current_connection_type}', Interface='{current_active_interface}', Velocidade Link='{current_link_speed_mbps if current_link_speed_mbps is not None else 'N/A'}' Mbps")
+    print("Pressione Ctrl+C para parar."); print_linha()
     
-    print(f"Monitorando link de rede: Tipo='{current_connection_type}', Interface='{current_active_interface}', Velocidade Link='{current_link_speed_mbps if current_link_speed_mbps is not None else 'N/A'}' Mbps")
-    print("Pressione Ctrl+C para parar.")
-    print_linha()
-
-    sql_metricas_cfg = "SELECT id_componente, tipo, unidade_medida FROM componente WHERE fk_componente_maquina = %s"
-    mycursor.execute(sql_metricas_cfg, (id_maquina_param,))
-    metricas_a_monitorar = mycursor.fetchall()
-
-    if not metricas_a_monitorar:
-        print("❌ Nenhuma métrica configurada. Monitoramento não pode iniciar."); return
-
-    print("Métricas sendo monitoradas (do DB):")
-    for m_cfg in metricas_a_monitorar: print(f"- Tipo: {m_cfg['tipo']} (ID Comp: {m_cfg['id_componente']})")
-    print_linha()
+    # Busca todos os dados do componente, incluindo os novos campos de threshold
+    sql_metricas_cfg = ("SELECT id_componente, tipo, unidade_medida, threshold_leve, threshold_grave, threshold_critico "
+                        "FROM componente WHERE fk_componente_maquina = %s")
+    mycursor.execute(sql_metricas_cfg, (id_maquina_param,)); metricas_a_monitorar = mycursor.fetchall()
     
-    last_net_io = psutil.net_io_counters() # Contadores globais do sistema
-    last_net_time = time.time()
+    if not metricas_a_monitorar: print("❌ Nenhuma métrica configurada."); return
+    print("Métricas monitoradas (do DB):"); [print(f"- Tipo: {m['tipo']} (ID Comp: {m['id_componente']})") for m in metricas_a_monitorar]; print_linha()
+    last_net_io, last_net_time = psutil.net_io_counters(), time.time()
     
     try:
         while True:
-            timestamp_ciclo = datetime.now()
-            dados_coletados_ciclo = []
-
+            timestamp_ciclo = datetime.now(); dados_coletados_ciclo = []
             processos_atuais = capturar_processos_sistema()
             if processos_atuais:
-                payload_proc = {'timestamp': timestamp_ciclo.isoformat(), 'processos': processos_atuais}
-                enviar_dados_api(API_PROCESS_ENDPOINT, id_maquina_param, payload_proc, "processos")
-
-            current_net_io = psutil.net_io_counters()
-            current_net_time = time.time()
-            elapsed_time_net = current_net_time - last_net_time
+                payload_proc = {'timestamp':timestamp_ciclo.isoformat(),'processos':processos_atuais}
+                enviar_dados_api(API_PROCESS_ENDPOINT,id_maquina_param,payload_proc,"processos")
             
+            current_net_io,current_net_time = psutil.net_io_counters(),time.time()
+            elapsed_time_net = current_net_time - last_net_time
             net_upload_mbps, net_download_mbps = 0.0, 0.0
             if elapsed_time_net > 0:
                 bytes_sent_delta = current_net_io.bytes_sent - last_net_io.bytes_sent
                 bytes_recv_delta = current_net_io.bytes_recv - last_net_io.bytes_recv
-                net_upload_mbps = (bytes_sent_delta * 8) / (elapsed_time_net * 1024 * 1024)
-                net_download_mbps = (bytes_recv_delta * 8) / (elapsed_time_net * 1024 * 1024)
-            
-            last_net_io = current_net_io
-            last_net_time = current_net_time
+                net_upload_mbps = (bytes_sent_delta*8)/(elapsed_time_net*1024*1024)
+                net_download_mbps = (bytes_recv_delta*8)/(elapsed_time_net*1024*1024)
+            last_net_io,last_net_time = current_net_io,current_net_time
 
-            for metrica_cfg in metricas_a_monitorar:
-                id_componente = metrica_cfg['id_componente']
-                tipo_metrica = metrica_cfg['tipo']
-                unidade_metrica_db = metrica_cfg['unidade_medida'] 
-                valor_atual = None
-                unidade_final_envio = unidade_metrica_db 
-
+            for metrica_cfg_db in metricas_a_monitorar: # metrica_cfg_db agora contém os thresholds do DB
+                id_componente,tipo_metrica,unidade_db = metrica_cfg_db['id_componente'],metrica_cfg_db['tipo'],metrica_cfg_db['unidade_medida']
+                valor_atual,unidade_envio = None,unidade_db
+                
                 try:
-                    if tipo_metrica == 'cpu_percent':
-                        valor_atual = psutil.cpu_percent(interval=None)
-                        verificar_e_disparar_alerta(tipo_metrica, valor_atual, CPU_CRITICAL_THRESHOLD, "Crítico", "Uso de CPU Elevado", f"CPU em {valor_atual:.1f}%.")
-                    elif tipo_metrica == 'disk_percent':
-                        valor_atual = psutil.disk_usage('/').percent
-                        verificar_e_disparar_alerta(tipo_metrica, valor_atual, DISK_HIGH_THRESHOLD, "Leve", "Uso de Disco Elevado", f"Disco em {valor_atual:.1f}%.")
-                    elif tipo_metrica == 'ram_percent':
-                        valor_atual = psutil.virtual_memory().percent
-                        verificar_e_disparar_alerta(tipo_metrica, valor_atual, RAM_CRITICAL_THRESHOLD, "Crítico", "Uso de RAM Elevado", f"RAM em {valor_atual:.1f}%.")
-                    elif tipo_metrica == 'disk_usage_gb':
-                        valor_atual = psutil.disk_usage('/').used / (1024 ** 3)
-                    elif tipo_metrica == 'ram_usage_gb':
-                        valor_atual = psutil.virtual_memory().used / (1024 ** 3)
-
-                    elif tipo_metrica == 'net_upload':
-                        valor_atual = net_upload_mbps
-                        unidade_final_envio = "Mbps" 
-                        if valor_atual < NET_UPLOAD_NO_CONNECTION_THRESHOLD and current_link_speed_mbps is not None :
-                             verificar_e_disparar_alerta(tipo_metrica, NET_UPLOAD_NO_CONNECTION_THRESHOLD, NET_UPLOAD_NO_CONNECTION_THRESHOLD, "Grave", "Sem Conexão de Upload", "Upload próximo de zero.")
-                    elif tipo_metrica == 'net_download':
-                        valor_atual = net_download_mbps
-                        unidade_final_envio = "Mbps" 
-
-                    elif tipo_metrica == 'link_speed_mbps':
-                        valor_atual = current_link_speed_mbps 
-                        unidade_final_envio = "Mbps"
+                    if tipo_metrica == 'cpu_percent': valor_atual = psutil.cpu_percent(interval=None)
+                    elif tipo_metrica == 'disk_percent': valor_atual = psutil.disk_usage('/').percent
+                    elif tipo_metrica == 'ram_percent': valor_atual = psutil.virtual_memory().percent
+                    elif tipo_metrica == 'disk_usage_gb': valor_atual = psutil.disk_usage('/').used / (1024**3)
+                    elif tipo_metrica == 'ram_usage_gb': valor_atual = psutil.virtual_memory().used / (1024**3)
+                    elif tipo_metrica == 'net_upload': valor_atual,unidade_envio = net_upload_mbps,"Mbps"
+                    elif tipo_metrica == 'net_download': valor_atual,unidade_envio = net_download_mbps,"Mbps"
+                    elif tipo_metrica == 'link_speed_mbps': valor_atual,unidade_envio = current_link_speed_mbps,"Mbps"
                     elif tipo_metrica == 'net_usage_percent':
-                        if current_link_speed_mbps is not None and current_link_speed_mbps > 0:
-                            trafego_total_mbps = net_upload_mbps + net_download_mbps
-                            valor_atual = (trafego_total_mbps / current_link_speed_mbps) * 100
-                            valor_atual = min(max(valor_atual, 0.0), 100.0) 
-                            verificar_e_disparar_alerta(tipo_metrica, valor_atual, NETWORK_USAGE_HIGH_THRESHOLD, "Moderado", "Uso de Rede Elevado", f"Uso do link de rede em {valor_atual:.1f}%.")
-                        else:
-                            valor_atual = 0 
-                        unidade_final_envio = "%"
-                        
-                    elif tipo_metrica == 'battery_percent':
-                        battery_info = psutil.sensors_battery(); valor_atual = battery_info.percent if battery_info else 0
-                        if valor_atual == BATTERY_CRITICAL_THRESHOLD: verificar_e_disparar_alerta(tipo_metrica, 0.1, 0.1, "Leve", "Robô Inativo (Bateria 0%)", "Bateria em 0%.") 
-                        elif valor_atual <= BATTERY_LOW_THRESHOLD and valor_atual > BATTERY_CRITICAL_THRESHOLD : verificar_e_disparar_alerta(tipo_metrica, BATTERY_LOW_THRESHOLD - valor_atual + 0.1 , 0.1, "Leve", "Bateria Baixa", f"Bateria em {valor_atual}%.")
-                    elif tipo_metrica == 'cpu_freq_ghz':
-                        cpu_f = psutil.cpu_freq(); valor_atual = (cpu_f.current / 1000) if cpu_f else 0
-                    elif tipo_metrica == 'uptime_hours':
-                        valor_atual = (time.time() - psutil.boot_time()) / 3600
-                        verificar_e_disparar_alerta(tipo_metrica, valor_atual, UPTIME_HIGH_THRESHOLD_HOURS, "Leve", "Uptime Elevado", f"Uptime {valor_atual:.1f} horas.")
+                        if current_link_speed_mbps and current_link_speed_mbps > 0:
+                            trafego_total = net_upload_mbps + net_download_mbps
+                            valor_atual = min(max((trafego_total/current_link_speed_mbps)*100,0.0),100.0)
+                        else: valor_atual = None 
+                        unidade_envio = "%"
+                    elif tipo_metrica == 'battery_percent': valor_atual = psutil.sensors_battery().percent if psutil.sensors_battery() else 0
+                    elif tipo_metrica == 'cpu_freq_ghz': cpu_f=psutil.cpu_freq(); valor_atual=(cpu_f.current/1000) if cpu_f else 0; unidade_envio="GHz"
+                    elif tipo_metrica == 'uptime_hours': valor_atual = (time.time()-psutil.boot_time())/3600
                     
                     if valor_atual is not None:
-                        dados_coletados_ciclo.append({'tipo': tipo_metrica, 'valor': valor_atual, 'unidade': unidade_final_envio})
-                        salvar_metrica_historico(id_componente, valor_atual, timestamp_ciclo)
-                        
-                        payload_metrica_api = {
-                            "timestamp": timestamp_ciclo.isoformat(), "tipo": tipo_metrica,
-                            "valor": round(valor_atual, 4) if isinstance(valor_atual, float) else valor_atual,
-                            "unidade": unidade_final_envio, "serial_number": serial_number
-                        }
-                        enviar_dados_api(API_METRIC_ENDPOINT, id_maquina_param, payload_metrica_api, f"métrica {tipo_metrica}")
-                except Exception as e_metrica:
-                    print(f"❌ Erro coletar/processar métrica {tipo_metrica}: {e_metrica}")
-            
-            cnx.commit()
-            print_linha("-", 30)
-            print(f"{timestamp_ciclo.strftime('%Y-%m-%d %H:%M:%S')} - Status:")
-            for dado in dados_coletados_ciclo: print(f"  {dado['tipo']}: {dado['valor']:.2f} {dado['unidade']}")
-            
-            tempo_processamento_ciclo = time.time() - current_net_time 
-            sleep_time = max(0, 5 - tempo_processamento_ciclo) 
-            time.sleep(sleep_time)
+                        if tipo_metrica in METRIC_THRESHOLDS_FAIXA: 
+                            verificar_e_disparar_alerta_faixa(metrica_cfg_db, valor_atual) 
+                        else: 
+                            if tipo_metrica == 'battery_percent':
+                                agora = datetime.now()
+                                ultimo_alerta_ts = alert_cooldown_tracker.get(tipo_metrica)
+                                if not ultimo_alerta_ts or agora > ultimo_alerta_ts:
+                                    msg_info = None
+                                    if valor_atual == BATTERY_CRITICAL_THRESHOLD:
+                                        msg_info = SPECIFIC_ALERT_MESSAGES.get("battery_grave_0_percent")
+                                    elif valor_atual <= BATTERY_LOW_THRESHOLD and valor_atual > BATTERY_CRITICAL_THRESHOLD:
+                                        msg_info = SPECIFIC_ALERT_MESSAGES.get("battery_leve_low")
+                                    
+                                    if msg_info:
+                                        if criar_alerta_jira_issue(tipo_metrica, msg_info["jira_sev"], msg_info["sum"], msg_info["desc"].format(v=valor_atual)):
+                                            alert_cooldown_tracker[tipo_metrica] = agora + timedelta(minutes=ALERT_COOLDOWN_MINUTES)
+                                            print(f"ℹ️ Alerta Bateria Nível '{msg_info['jira_sev']}' para {tipo_metrica} ({valor_atual:.0f}) ativado. Cooldown.")
 
-    except KeyboardInterrupt:
-        print("\nMonitoramento interrompido.");
-        if cnx and cnx.is_connected(): cnx.commit()
+                            elif tipo_metrica == 'net_upload':
+                                agora = datetime.now()
+                                ultimo_alerta_ts = alert_cooldown_tracker.get(tipo_metrica)
+                                if not ultimo_alerta_ts or agora > ultimo_alerta_ts:
+                                    if current_link_speed_mbps is not None and valor_atual < NET_UPLOAD_NO_CONNECTION_THRESHOLD:
+                                        msg_info = SPECIFIC_ALERT_MESSAGES.get("net_upload_no_connection")
+                                        if msg_info and criar_alerta_jira_issue(tipo_metrica, msg_info["jira_sev"], msg_info["sum"], msg_info["desc"].format(v=valor_atual)):
+                                            alert_cooldown_tracker[tipo_metrica] = agora + timedelta(minutes=ALERT_COOLDOWN_MINUTES)
+                                            print(f"ℹ️ Alerta Upload Zero para {tipo_metrica} ({valor_atual:.2f}) ativado. Cooldown.")
+                            
+                            elif tipo_metrica == 'uptime_hours':
+                                agora = datetime.now()
+                                ultimo_alerta_ts = alert_cooldown_tracker.get(tipo_metrica)
+                                if not ultimo_alerta_ts or agora > ultimo_alerta_ts:
+                                    if valor_atual >= UPTIME_HIGH_THRESHOLD_HOURS:
+                                        msg_info = SPECIFIC_ALERT_MESSAGES.get("uptime_high")
+                                        if msg_info and criar_alerta_jira_issue(tipo_metrica, msg_info["jira_sev"], msg_info["sum"], msg_info["desc"].format(v=valor_atual)):
+                                            alert_cooldown_tracker[tipo_metrica] = agora + timedelta(minutes=ALERT_COOLDOWN_MINUTES)
+                                            print(f"ℹ️ Alerta Uptime Elevado para {tipo_metrica} ({valor_atual:.1f}) ativado. Cooldown.")
+                        
+                        dados_coletados_ciclo.append({'tipo':tipo_metrica,'valor':valor_atual,'unidade':unidade_envio})
+                        # salvar_metrica_historico(id_componente,valor_atual,timestamp_ciclo)
+                        payload_api = {"timestamp":timestamp_ciclo.isoformat(),"tipo":tipo_metrica,
+                                       "valor":round(valor_atual,4) if isinstance(valor_atual,float) else valor_atual,
+                                       "unidade":unidade_envio,"serial_number":serial_number}
+                        enviar_dados_api(API_METRIC_ENDPOINT,id_maquina_param,payload_api,f"métrica {tipo_metrica}")
+                except Exception as e: print(f"❌ Erro coletar/proc métrica {tipo_metrica}: {e}")
+            cnx.commit()
+            print_linha("-",30); print(f"{timestamp_ciclo:%Y-%m-%d %H:%M:%S} - Status:")
+            for dado in dados_coletados_ciclo: print(f"  {dado['tipo']}: {dado['valor']:.2f} {dado['unidade']}")
+            tempo_proc_ciclo = time.time()-current_net_time; sleep_t = max(0,5-tempo_proc_ciclo); time.sleep(sleep_t)
+    except KeyboardInterrupt: print("\nMonitoramento interrompido.");
     finally:
+        if cnx and cnx.is_connected(): cnx.commit()
         if voltar_ao_menu_ou_encerrar(): return
         else: encerrar_servico()
+
+# --- Função Gerenciar Métricas ---
 def gerenciar_metricas_maquina(id_maquina_param):
-    """Permite visualizar e editar limites (mínimo/máximo) das métricas de uma máquina."""
-    print_linha()
-    print("Gerenciamento de Métricas")
-    print_linha("=", 73)
-
-    sql_select = """
-        SELECT id_componente, tipo, modelo, minimo, maximo, unidade_medida
-        FROM componente
-        WHERE fk_componente_maquina = %s;
-    """
-    mycursor.execute(sql_select, (id_maquina_param,))
-    metricas = mycursor.fetchall()
-
-    if not metricas:
-        print("❌ Nenhuma métrica encontrada para esta máquina.")
-        if voltar_ao_menu_ou_encerrar(): return 
-        else: encerrar_servico()
-        return 
-
-    print("Métricas registradas no sistema para esta máquina:")
-    for m in metricas:
-        print(f"ID: {m['id_componente']} | Tipo: {m['tipo']} | Modelo: {m['modelo']} | Unidade: {m.get('unidade_medida', 'N/A')} | Mínimo: {m['minimo']} | Máximo: {m['maximo']}")
-
-    print_linha()
-    try:
-        id_metrica_editar_str = input("Digite o ID da métrica que deseja editar (ou 0 para voltar): ").strip()
-        if not id_metrica_editar_str:
-            print("Nenhum ID fornecido.")
-            if voltar_ao_menu_ou_encerrar(): return
-            else: encerrar_servico()
-            return
-
-        id_metrica_editar = int(id_metrica_editar_str)
-
-        if id_metrica_editar == 0:
-            if voltar_ao_menu_ou_encerrar(): return
-            else: encerrar_servico()
-            return
-
-        metrica_selecionada = next((m for m in metricas if m['id_componente'] == id_metrica_editar), None)
-
-        if not metrica_selecionada:
-            print("❌ Métrica não encontrada com o ID fornecido.")
-        else:
-            print(f"Editando a métrica: {metrica_selecionada['tipo']} (Modelo: {metrica_selecionada['modelo']})")
-            print(f"Mínimo atual: {metrica_selecionada['minimo']} | Máximo atual: {metrica_selecionada['maximo']}")
-
-            novo_minimo_str = input(f"Digite o novo valor mínimo (atual: {metrica_selecionada['minimo']}): ").strip()
-            novo_maximo_str = input(f"Digite o novo valor máximo (atual: {metrica_selecionada['maximo']}): ").strip()
-
-            novo_minimo = float(novo_minimo_str) if novo_minimo_str else metrica_selecionada['minimo']
-            novo_maximo = float(novo_maximo_str) if novo_maximo_str else metrica_selecionada['maximo']
-
-            if novo_minimo >= novo_maximo:
-                print("❌ Erro: O valor mínimo deve ser menor que o valor máximo.")
+    print_linha(); print("Gerenciamento de Limiares de Alerta dos Componentes"); print_linha("=",73)
+    sql_comp = ("SELECT id_componente, tipo, modelo, unidade_medida, threshold_leve, threshold_grave, threshold_critico "
+                "FROM componente WHERE fk_componente_maquina = %s ORDER BY tipo")
+    mycursor.execute(sql_comp, (id_maquina_param,)); componentes = mycursor.fetchall()
+    if not componentes: print("❌ Nenhuma métrica (componente) cadastrada.");
+    else:
+        print("Componentes e Limiares de Alerta Atuais:")
+        for i, comp in enumerate(componentes):
+            print(f"  {i+1}. Tipo: {comp['tipo']} (ID: {comp['id_componente']})")
+            if comp['tipo'] in METRIC_THRESHOLDS_FAIXA: 
+                 print(f"     Leve   : {comp.get('threshold_leve', 'N/A')}")
+                 print(f"     Grave  : {comp.get('threshold_grave', 'N/A')}")
+                 print(f"     Crítico: {comp.get('threshold_critico', 'N/A')}")
+            else: print("     (Alerta específico, não editável por esta interface de faixas)")
+        print_linha("-",30)
+        try:
+            escolha_comp_idx_str = input("Número do componente para editar limiares (0 voltar): ").strip()
+            if not escolha_comp_idx_str: pass 
             else:
-                sql_update = "UPDATE componente SET minimo = %s, maximo = %s WHERE id_componente = %s"
-                mycursor.execute(sql_update, (novo_minimo, novo_maximo, id_metrica_editar))
-                cnx.commit()
-                print("✅ Métrica atualizada com sucesso!")
-
-    except ValueError:
-        print("❌ Entrada inválida. Por favor, digite um número para ID, mínimo e máximo.")
-    except Exception as e:
-        print(f"❌ Erro ao editar a métrica: {str(e)}")
-
+                escolha_comp_idx = int(escolha_comp_idx_str)
+                if escolha_comp_idx > 0 and escolha_comp_idx <= len(componentes):
+                    comp_sel = componentes[escolha_comp_idx - 1]
+                    id_comp_sel, tipo_comp_sel = comp_sel['id_componente'], comp_sel['tipo']
+                    if tipo_comp_sel not in METRIC_THRESHOLDS_FAIXA:
+                        print(f"'{tipo_comp_sel}' usa alerta específico, não editável aqui.");
+                    else:
+                        print(f"Editando Limiares para: {tipo_comp_sel} (ID: {id_comp_sel})")
+                        print("(Deixe em branco para manter; 'NULL' para remover limiar)")
+                        th_l_atu,th_g_atu,th_c_atu = comp_sel.get('threshold_leve'),comp_sel.get('threshold_grave'),comp_sel.get('threshold_critico')
+                        def proc_lim_inp(inp_str, atu_val):
+                            if inp_str.upper()=='NULL': return None
+                            return float(inp_str) if inp_str else atu_val
+                        n_th_l = proc_lim_inp(input(f"Novo Leve (atual:{th_l_atu if th_l_atu is not None else 'N/A'}): ").strip(), th_l_atu)
+                        n_th_g = proc_lim_inp(input(f"Novo Grave (atual:{th_g_atu if th_g_atu is not None else 'N/A'}): ").strip(), th_g_atu)
+                        n_th_c = proc_lim_inp(input(f"Novo Crítico (atual:{th_c_atu if th_c_atu is not None else 'N/A'}): ").strip(), th_c_atu)
+                        validos = True
+                        if n_th_l is not None and n_th_g is not None and n_th_l >= n_th_g: print("❌ Leve >= Grave"); validos=False
+                        if n_th_g is not None and n_th_c is not None and n_th_g >= n_th_c: print("❌ Grave >= Crítico"); validos=False
+                        if n_th_l is not None and n_th_c is not None and n_th_l >= n_th_c: print("❌ Leve >= Crítico"); validos=False
+                        if validos:
+                            sql_upd = "UPDATE componente SET threshold_leve=%s,threshold_grave=%s,threshold_critico=%s WHERE id_componente=%s"
+                            mycursor.execute(sql_upd,(n_th_l,n_th_g,n_th_c,id_comp_sel)); cnx.commit(); print("✅ Limiares atualizados!")
+                        else: print("Limiares não atualizados por erro de validação.")
+                elif escolha_comp_idx != 0: print("❌ Número de componente inválido.")
+        except ValueError: print("❌ Entrada inválida.")
+        except Exception as e: print(f"❌ Erro gerenciar limiares: {e}")
     if voltar_ao_menu_ou_encerrar(): return
     else: encerrar_servico()
 
+# --- Função Principal de Execução ---
 def executar():
     id_maquina_ativo = None
     registrada, id_maquina_registrada, _ = verificar_maquina_registrada()
@@ -682,12 +726,10 @@ def executar():
         if login_sucesso and id_maquina_apos_login: id_maquina_ativo = id_maquina_apos_login
         else: print("❌ Falha login/registro. Encerrando."); encerrar_servico(); return
     if not id_maquina_ativo: print("ERRO CRÍTICO: ID de máquina inválido. Encerrando."); encerrar_servico(); return
-
     def menu_inicial_display(): print_linha(); print(" Bem-vindo ao Sentinela v2.0 ".center(73, "=")); print_linha()
     def escolha_usuario_display():
         print_linha(); print("\nOpções:");
         return input("1. Info Máquina | 2. Monitorar | 3. Gerenciar Métricas | 0. Encerrar\nEscolha: ").strip()
-
     while True:
         menu_inicial_display(); escolha = escolha_usuario_display()
         if escolha == "1": menu_informacoes_maquina()
@@ -696,12 +738,23 @@ def executar():
         elif escolha == "0": encerrar_servico(); break
         else: print_linha(); print("Opção inválida!")
 
-
+# --- Bloco Principal ---
 if __name__ == "__main__":
     if not CONFIG[AMBIENTE].get("password") or not CONFIG[AMBIENTE].get("host") or not cnx or not mycursor:
         print("ERRO FATAL: Config DB falhou. Verifique .env. Encerrando.")
     else:
         print("Obtendo informações de rede para configuração inicial...")
-        get_active_network_link_info(verbose=False) #
+        get_active_network_link_info(verbose=False) 
         print("Pronto para iniciar.")
-        executar()
+        # # --- Bloco de Correção Temporário (Exemplo, ajuste o ID e rode uma vez se necessário) ---
+        # id_da_maquina_para_corrigir = 2 # Coloque o ID da sua máquina aqui
+        # print(f"\n--- EXECUTANDO CORREÇÃO/ATUALIZAÇÃO DE MÉTRICAS PARA MÁQUINA ID {id_da_maquina_para_corrigir} ---")
+        # try:
+        #     cadastrar_metricas_padrao(id_da_maquina_para_corrigir) # Isso vai popular os novos campos de threshold com defaults
+        #     print(f"--- CORREÇÃO/ATUALIZAÇÃO DE MÉTRICAS CONCLUÍDA PARA MÁQUINA ID {id_da_maquina_para_corrigir} ---")
+        # except Exception as e_fix:
+        #     print(f"Ocorreu um erro durante a correção das métricas: {e_fix}")
+        # print("\nBloco de correção executado/verificado. Para operação normal, comente este bloco e descomente 'executar()'.")
+        # # --- Fim do Bloco de Correção ---
+        
+        executar() # Comente esta linha se estiver rodando o bloco de correção acima. Descomente para operação normal.
