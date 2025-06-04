@@ -677,6 +677,9 @@ def monitoramento_em_tempo_real(id_maquina_param):
     network_link_info = get_active_network_link_info(verbose=True)
     current_link_speed_mbps = network_link_info.get('speed_mbps')
     current_connection_type = network_link_info.get('type', "Desconhecido")
+    
+    print(f"DEBUG: Velocidade do Link Detectada (Inicial): {current_link_speed_mbps}")
+    
     current_active_interface = network_link_info.get('interface', "N/A")
     print(f"Monitorando link: Tipo='{current_connection_type}', Interface='{current_active_interface}', Velocidade Link='{current_link_speed_mbps if current_link_speed_mbps is not None else 'N/A'}' Mbps")
     print("Pressione Ctrl+C para parar."); print_linha()
@@ -690,9 +693,6 @@ def monitoramento_em_tempo_real(id_maquina_param):
     print("Métricas monitoradas (do DB):"); [print(f"- Tipo: {m['tipo']} (ID Comp: {m['id_componente']})") for m in metricas_a_monitorar]; print_linha()
     last_net_io, last_net_time = psutil.net_io_counters(), time.time()
     
-
-    
-    
     try:
         while True:
             # Rodando agente de comandos
@@ -703,6 +703,8 @@ def monitoramento_em_tempo_real(id_maquina_param):
                 payload_proc = {'timestamp':timestamp_ciclo.isoformat(),'processos':processos_atuais}
                 enviar_dados_api(API_PROCESS_ENDPOINT,id_maquina_param,payload_proc,"processos")
             
+            # Cálculo de net_upload_mbps e net_download_mbps deve permanecer aqui
+            # pois são usados por net_usage_percent e pelas próprias métricas de upload/download
             current_net_io,current_net_time = psutil.net_io_counters(),time.time()
             elapsed_time_net = current_net_time - last_net_time
             net_upload_mbps, net_download_mbps = 0.0, 0.0
@@ -712,6 +714,14 @@ def monitoramento_em_tempo_real(id_maquina_param):
                 net_upload_mbps = (bytes_sent_delta*8)/(elapsed_time_net*1024*1024)
                 net_download_mbps = (bytes_recv_delta*8)/(elapsed_time_net*1024*1024)
             last_net_io,last_net_time = current_net_io,current_net_time
+
+            # O print de DEBUG da velocidade do link no loop também deve ser movido para dentro do loop
+            # para refletir o valor que será usado no cálculo, caso ele seja atualizado em algum momento.
+            # No seu código, current_link_speed_mbps é fixo após a primeira chamada.
+            # Se a velocidade do link puder mudar dinamicamente (ex: Wi-Fi reconecta com velocidade diferente),
+            # você precisaria chamar get_active_network_link_info dentro do loop também.
+            # Por enquanto, mantemos a lógica que você tinha, mas com o print no lugar certo.
+            print(f"DEBUG: Velocidade do Link no Loop (para cálculo): {current_link_speed_mbps} Mbps") 
 
             for metrica_cfg_db in metricas_a_monitorar: # metrica_cfg_db agora contém os thresholds do DB
                 id_componente,tipo_metrica,unidade_db = metrica_cfg_db['id_componente'],metrica_cfg_db['tipo'],metrica_cfg_db['unidade_medida']
@@ -727,11 +737,21 @@ def monitoramento_em_tempo_real(id_maquina_param):
                     elif tipo_metrica == 'net_download': valor_atual,unidade_envio = net_download_mbps,"Mbps"
                     elif tipo_metrica == 'link_speed_mbps': valor_atual,unidade_envio = current_link_speed_mbps,"Mbps"
                     elif tipo_metrica == 'net_usage_percent':
-                        if current_link_speed_mbps and current_link_speed_mbps > 0:
+                        # A lógica de cálculo e fallback para net_usage_percent agora está aqui
+                        print(f"DEBUG: current_link_speed_mbps para net_usage_percent: {current_link_speed_mbps}")
+                        if current_link_speed_mbps is not None and current_link_speed_mbps > 0:
                             trafego_total = net_upload_mbps + net_download_mbps
                             valor_atual = min(max((trafego_total/current_link_speed_mbps)*100,0.0),100.0)
-                        else: valor_atual = None 
-                        unidade_envio = "%"
+                        else: 
+                            # Fallback: Se a velocidade do link não for detectada, usa um valor padrão para o cálculo
+                            fallback_link_speed_mbps = 100.0 # Exemplo: assume um link de 100 Mbps
+                            trafego_total = net_upload_mbps + net_download_mbps
+                            if fallback_link_speed_mbps > 0:
+                                valor_atual = min(max((trafego_total / fallback_link_speed_mbps) * 100, 0.0), 100.0)
+                            else:
+                                valor_atual = 0.0 
+                            print(f"AVISO: Velocidade do link de rede não detectada ou é zero. Usando fallback ({fallback_link_speed_mbps} Mbps) para cálculo de net_usage_percent. Valor: {valor_atual:.2f}%")
+                        unidade_envio = "%" # Garante que a unidade seja definida
                     elif tipo_metrica == 'battery_percent': valor_atual = psutil.sensors_battery().percent if psutil.sensors_battery() else 0
                     elif tipo_metrica == 'cpu_freq_ghz': cpu_f=psutil.cpu_freq(); valor_atual=(cpu_f.current/1000) if cpu_f else 0; unidade_envio="GHz"
                     elif tipo_metrica == 'uptime_hours': valor_atual = (time.time()-psutil.boot_time())/3600
