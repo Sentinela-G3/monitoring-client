@@ -245,6 +245,7 @@ def verificar_maquina_registrada():
     global id_empresa_global
     print_linha()
     print("🔍 Buscando máquina...")
+    
     sql = "SELECT id_maquina, fk_maquina_empresa, modelo FROM maquina WHERE serial_number = %s"
     mycursor.execute(sql, (serial_number,))
     resultado = mycursor.fetchone()
@@ -928,6 +929,7 @@ def monitoramento_em_tempo_real(id_maquina_param):
                                             print(f"ℹ️ Alerta Uptime Elevado para {tipo_metrica} ({valor_atual:.1f}) ativado. Cooldown.")
                         
                         dados_coletados_ciclo.append({'tipo':tipo_metrica,'valor':valor_atual,'unidade':unidade_envio})
+                        salvar_metrica_historico(id_componente,valor_atual,timestamp_ciclo)
                         payload_api = {"timestamp":timestamp_ciclo.isoformat(),"tipo":tipo_metrica,
                                        "valor":round(valor_atual,4) if isinstance(valor_atual,float) else valor_atual,
                                        "unidade":unidade_envio,"serial_number":serial_number}
