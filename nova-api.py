@@ -65,7 +65,7 @@ JIRA_RECURSO_MAP = {
 
 METRIC_THRESHOLDS_FAIXA = {
     "cpu_percent": { 
-        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "Aumento crítico de: {v:.1f}%"},
+        "critico": {"val": CPU_CRITICAL_THRESHOLD, "sum": "CPU - Nível Crítico", "desc": "Aumento crítico de CPU: {v:.1f}%"},
         "grave":   {"val": 75.0,                     "sum": "CPU - Nível Grave",   "desc": "Uso de CPU grave: {v:.1f}%"},
         "leve":    {"val": 60.0,                     "sum": "CPU - Nível Leve",    "desc": "Leve aumento no uso de CPU: {v:.1f}%"}
     },
