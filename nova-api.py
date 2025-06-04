@@ -242,44 +242,65 @@ def menu_informacoes_maquina():
 
 # --- Funções de Autenticação e Registro ---
 def verificar_maquina_registrada():
-    global id_empresa_global; print_linha(); print("🔍 Buscando máquina...");
-    sql = "SELECT id_maquina, fk_maquina_empresa FROM maquina WHERE serial_number = %s"
-    mycursor.execute(sql, (serial_number,)); resultado = mycursor.fetchone()
+    global id_empresa_global
+    print_linha()
+    print("🔍 Buscando máquina...")
+    sql = "SELECT id_maquina, fk_maquina_empresa, modelo FROM maquina WHERE serial_number = %s"
+    mycursor.execute(sql, (serial_number,))
+    resultado = mycursor.fetchone()
     if resultado:
-        id_maquina_atual = resultado['id_maquina']; id_empresa_global = resultado['fk_maquina_empresa']
+        id_maquina_atual = resultado['id_maquina']
+        id_empresa_global = resultado['fk_maquina_empresa']
+        fk_maquina_modelo = resultado['modelo']
         print(f"✅ Máquina '{serial_number}' (ID:{id_maquina_atual}) encontrada, empresa ID:{id_empresa_global}.")
-        return True, id_maquina_atual, id_empresa_global
-    print(f"❌ Máquina '{serial_number}' não encontrada."); return False, None, None
+        return True, id_maquina_atual, id_empresa_global, fk_maquina_modelo
+    print(f"❌ Máquina '{serial_number}' não encontrada.")
+    return False, None, None, None
 
 def fazer_login_e_registrar_maquina():
-    global id_empresa_global; print_linha(); print("🔐 Login para associar máquina.")
+    global id_empresa_global
+    print_linha()
+    print("🔐 Login para associar máquina.")
     while True:
-        email = input("E-mail: ").strip(); senha = input("Senha: ").strip()
+        email = input("E-mail: ").strip()
+        senha = input("Senha: ").strip()
         sql_user = "SELECT id_usuario, fk_colaborador_empresa FROM colaborador WHERE email = %s AND senha = SHA2(%s, 256)"
-        mycursor.execute(sql_user, (email, senha)); usuario = mycursor.fetchone()
+        mycursor.execute(sql_user, (email, senha))
+        usuario = mycursor.fetchone()
         if usuario:
-            print("🔓 Login sucesso."); id_empresa_global = usuario['fk_colaborador_empresa']
+            print("🔓 Login sucesso.")
+            id_empresa_global = usuario['fk_colaborador_empresa']
             id_maquina_cadastrada = cadastrar_maquina_atual(id_empresa_global)
-            if id_maquina_cadastrada: return True, id_maquina_cadastrada, id_empresa_global
-            print("❌ Falha ao cadastrar máquina pós-login."); return False, None, id_empresa_global
-        print("❌ Credenciais inválidas."); retry = input("Tentar (S/N)? ").strip().lower()
-        if retry != 's': return False, None, None
+            if id_maquina_cadastrada:
+                return True, id_maquina_cadastrada, id_empresa_global
+            print("❌ Falha ao cadastrar máquina pós-login.")
+            return False, None, id_empresa_global
+        print("❌ Credenciais inválidas.")
+        retry = input("Tentar (S/N)? ").strip().lower()
+        if retry != 's':
+            return False, None, None
 
 def cadastrar_maquina_atual(id_empresa_param):
-    print_linha(); setor = input(f"Setor da máquina '{serial_number}': ").strip(); print_linha()
-    print(f"SO: {sistema_detalhado}\nSerial: {serial_number}\nINICIANDO CADASTRO...");
+    print_linha()
+    setor = input(f"Setor da máquina '{serial_number}': ").strip()
+    print_linha()
+    print(f"SO: {sistema_detalhado}\nSerial: {serial_number}\nINICIANDO CADASTRO...")
     try:
-        sql_insert = "INSERT INTO maquina (so, serial_number, setor, fk_maquina_empresa) VALUES (%s, %s, %s, %s)"
-        mycursor.execute(sql_insert, (sistema_detalhado, serial_number, setor, id_empresa_param)); cnx.commit()
-        id_maquina_nova = mycursor.lastrowid; print(f"✅ MÁQUINA REGISTRADA! ID: {id_maquina_nova}")
-        cadastrar_metricas_padrao(id_maquina_nova); return id_maquina_nova
-    except mysql.connector.Error as err: print(f"❌ Erro ao cadastrar máquina: {err}"); return None
+        sql_insert = "INSERT INTO maquina (so, serial_number, setor, fk_maquina_empresa, modelo) VALUES (%s, %s, %s, %s, NULL)"
+        mycursor.execute(sql_insert, (sistema_detalhado, serial_number, setor, id_empresa_param))
+        cnx.commit()
+        id_maquina_nova = mycursor.lastrowid
+        print(f"✅ MÁQUINA REGISTRADA! ID: {id_maquina_nova}")
+        cadastrar_metricas_padrao(id_maquina_nova)
+        return id_maquina_nova
+    except mysql.connector.Error as err:
+        print(f"❌ Erro ao cadastrar máquina: {err}")
+        return None
 
 def cadastrar_metricas_padrao(id_maquina_param):
     network_info_initial = get_active_network_link_info(verbose=False)
     modelo_rede_principal = network_info_initial.get('modelo_detalhado', 'Rede (Padrão)')
 
-    # A lista metricas_definidas continua igual, pois define os componentes e suas unidades/modelos base
     metricas_definidas = [
         {"tipo": "cpu_percent", "descricao": "Percentual de CPU", "modelo": processador_modelo, "unidade": "%"},
         {"tipo": "disk_percent", "descricao": "Percentual de uso de disco", "modelo": "Disco Principal", "unidade": "%"},
@@ -304,11 +325,10 @@ def cadastrar_metricas_padrao(id_maquina_param):
             threshold_grave_val = config_alerta_faixa.get("grave", {}).get("val")
             threshold_critico_val = config_alerta_faixa.get("critico", {}).get("val")
 
-            # --- INÍCIO DA MODIFICAÇÃO PROPOSTA ---
             if metrica_info['tipo'] == 'battery_percent':
                 if threshold_leve_val is None: 
                     threshold_leve_val = BATTERY_LOW_THRESHOLD
-                if threshold_grave_val is None: # Associado ao alerta "Grave" do SPECIFIC_ALERT_MESSAGES
+                if threshold_grave_val is None: 
                     threshold_grave_val = BATTERY_CRITICAL_THRESHOLD
 
             elif metrica_info['tipo'] == 'uptime_hours':
@@ -343,6 +363,109 @@ def cadastrar_metricas_padrao(id_maquina_param):
             print(f"❌ Erro ao processar componente '{metrica_info['descricao']}': {err}")
     cnx.commit()
     print_linha(); print("TODOS OS COMPONENTES E LIMIARES PADRÃO (INCLUINDO OS DE ALERTA ESPECÍFICO) FORAM CONFIGURADOS/ATUALIZADOS!")
+
+# --- Funções de Gerenciamento de Modelos ---
+def listar_modelos_existentes():
+    """Lista todos os modelos de máquina existentes no banco de dados."""
+    print_linha("-", 50)
+    print("Modelos de Máquina Existentes:")
+    sql = "SELECT id_modelo, nome FROM modelo ORDER BY nome"
+    mycursor.execute(sql)
+    modelos = mycursor.fetchall()
+    if not modelos:
+        print("Nenhum modelo cadastrado.")
+        return []
+    for i, modelo in enumerate(modelos):
+        print(f"  {i+1}. ID: {modelo['id_modelo']} - Nome: {modelo['nome']}")
+    print_linha("-", 50)
+    return modelos
+
+def cadastrar_novo_modelo():
+    """Permite ao usuário cadastrar um novo modelo de máquina."""
+    print_linha()
+    while True:
+        nome_novo_modelo = input("Digite o nome do novo modelo: ").strip()
+        if not nome_novo_modelo:
+            print("O nome do modelo não pode ser vazio.")
+            continue
+        
+        # Verifica se o modelo já existe
+        sql_check = "SELECT id_modelo FROM modelo WHERE nome = %s"
+        mycursor.execute(sql_check, (nome_novo_modelo,))
+        if mycursor.fetchone():
+            print(f"❌ Modelo '{nome_novo_modelo}' já existe. Tente outro nome ou selecione-o.")
+            return None 
+        
+        try:
+            sql_insert = "INSERT INTO modelo (nome) VALUES (%s)"
+            mycursor.execute(sql_insert, (nome_novo_modelo,))
+            cnx.commit()
+            novo_id_modelo = mycursor.lastrowid
+            print(f"✅ Modelo '{nome_novo_modelo}' cadastrado com sucesso! ID: {novo_id_modelo}")
+            return novo_id_modelo
+        except mysql.connector.Error as err:
+            print(f"❌ Erro ao cadastrar novo modelo: {err}")
+            return None
+
+def obter_ou_atribuir_modelo_maquina(id_maquina_param, modelo_atual_id):
+    """
+    Permite ao usuário selecionar um modelo existente ou cadastrar um novo
+    e atribui à máquina especificada.
+    """
+    print_linha()
+    if modelo_atual_id:
+        sql_get_model_name = "SELECT nome FROM modelo WHERE id_modelo = %s"
+        mycursor.execute(sql_get_model_name, (modelo_atual_id,))
+        modelo_nome = mycursor.fetchone()
+        if modelo_nome:
+            print(f"Máquina ID {id_maquina_param} já possui o modelo: {modelo_nome['nome']}")
+            return True 
+        else:
+            print(f"Máquina ID {id_maquina_param} possui um ID de modelo ({modelo_atual_id}) que não existe. Atribuindo um novo.")
+            # Se o ID do modelo não existe, tratamos como se não tivesse modelo
+            modelo_atual_id = None 
+
+    id_modelo_selecionado = None
+    while id_modelo_selecionado is None:
+        print("\nOpções de Modelo:")
+        print("1. Selecionar modelo existente")
+        print("2. Cadastrar novo modelo")
+        print("0. Pular (manter sem modelo - NÃO RECOMENDADO)")
+        escolha = input("Escolha uma opção: ").strip()
+
+        if escolha == '1':
+            modelos_existentes = listar_modelos_existentes()
+            if not modelos_existentes:
+                print("Nenhum modelo existente para selecionar. Por favor, cadastre um novo.")
+                continue
+            try:
+                idx_selecionado = int(input("Digite o NÚMERO do modelo desejado: ").strip())
+                if 1 <= idx_selecionado <= len(modelos_existentes):
+                    id_modelo_selecionado = modelos_existentes[idx_selecionado - 1]['id_modelo']
+                else:
+                    print("Escolha inválida.")
+            except ValueError:
+                print("Entrada inválida. Digite um número.")
+        elif escolha == '2':
+            id_modelo_selecionado = cadastrar_novo_modelo()
+        elif escolha == '0':
+            print("Atribuição de modelo pulada.")
+            return True # Retorna True para indicar que o processo foi concluído, mesmo que pulado
+        else:
+            print("Opção inválida.")
+    
+    if id_modelo_selecionado:
+        try:
+            sql_update = "UPDATE maquina SET modelo = %s WHERE id_maquina = %s"
+            mycursor.execute(sql_update, (id_modelo_selecionado, id_maquina_param))
+            cnx.commit()
+            print(f"✅ Modelo atribuído à máquina ID {id_maquina_param} com sucesso!")
+            return True
+        except mysql.connector.Error as err:
+            print(f"❌ Erro ao atribuir modelo à máquina: {err}")
+            return False
+    return False # Se chegou aqui, algo deu errado e nenhum modelo foi atribuído
+
 # --- Funções de Captura de Velocidade de Link ---
 def get_wifi_link_speed_linux(interface='wlan0'):
     try:
@@ -358,13 +481,20 @@ def get_wifi_link_speed_linux(interface='wlan0'):
 
 def get_wifi_link_speed_windows():
     try:
-        cmd = "netsh wlan show interfaces"; result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False, encoding='cp850', errors='ignore')
-        if result.returncode != 0: return None
+        cmd = "netsh wlan show interfaces"; 
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False, encoding='cp850', errors='ignore')
+        if result.returncode != 0: 
+            print(f"DEBUG: netsh wlan show interfaces retornou código {result.returncode}. Erro: {result.stderr.strip()}")
+            return None
         output = result.stdout
+        print(f"DEBUG: Saída de netsh wlan show interfaces:\n{output}")
         for pattern_key in [r'Transmit rate \(Mbps\)\s*:\s*([\d.]+)', r'Receive rate \(Mbps\)\s*:\s*([\d.]+)', r'Taxa de transmissão \(Mbps\)\s*:\s*([\d.]+)', r'Taxa de recepção \(Mbps\)\s*:\s*([\d.]+)']:
             match = re.search(pattern_key, output)
-            if match: return float(match.group(1))
-    except: return None
+            if match: 
+                print(f"DEBUG: Velocidade Wi-Fi (Windows) encontrada: {match.group(1)} Mbps")
+                return float(match.group(1))
+    except Exception as e: 
+        print(f"ERRO: Falha ao obter velocidade Wi-Fi (Windows): {e}")
     return None
 
 def get_wifi_link_speed_macos():
@@ -389,15 +519,33 @@ def get_ethernet_link_speed_linux(interface='eth0'):
 
 def get_ethernet_link_speed_windows(adapter_name_hint="Ethernet"):
     try:
-        cmd = f'wmic nic where "NetConnectionStatus=2 AND (Name LIKE \'%{adapter_name_hint}%\' OR NetConnectionID LIKE \'%{adapter_name_hint}%\')" get Speed'
+        cmd = 'wmic nic where "NetConnectionStatus=2" get Name, Speed /format:list'
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False, encoding='cp850', errors='ignore')
-        if result.returncode != 0: return None
-        output = result.stdout.strip(); lines = output.splitlines()
-        if len(lines) > 1:
-            for line in lines[1:]:
-                if line.strip().isdigit(): speed_bps = int(line.strip()); return speed_bps / 1000000 
-    except FileNotFoundError: print(f"AVISO: 'wmic' não encontrado para Ethernet em Windows."); return None
-    except: return None
+        
+        if result.returncode != 0:
+            print(f"DEBUG: wmic nic retornou código {result.returncode}. Erro: {result.stderr.strip()}")
+            return None
+        
+        output = result.stdout.strip()
+        print(f"DEBUG: Saída de wmic nic para Ethernet:\n{output}")
+        
+        matches = re.findall(r'Name=(.*?)\s*\nSpeed=(\d+)', output, re.IGNORECASE)
+        
+        for name, speed_str in matches:
+            if adapter_name_hint.lower() in name.lower() or "ethernet" in name.lower() or "conexão local" in name.lower():
+                try:
+                    speed_bps = int(speed_str)
+                    speed_mbps = speed_bps / 1000000 
+                    print(f"DEBUG: Velocidade Ethernet (Windows) encontrada para '{name}': {speed_mbps:.2f} Mbps")
+                    return speed_mbps
+                except ValueError:
+                    print(f"AVISO: Não foi possível converter velocidade '{speed_str}' para número para '{name}'.")
+                    continue
+        
+    except FileNotFoundError: 
+        print(f"AVISO: 'wmic' não encontrado para Ethernet em Windows.")
+    except Exception as e: 
+        print(f"ERRO: Falha ao obter velocidade Ethernet (Windows): {e}")
     return None
 
 def get_ethernet_link_speed_macos(interface_port='en0'):
@@ -443,9 +591,10 @@ def get_active_network_link_info(verbose=True):
                 speed = get_ethernet_link_speed_linux(interface=iface)
                 if speed is not None: active_interface,connection_type,link_speed = iface,"Ethernet",speed; break
         elif sistema_operacional == "Windows":
-            for hint in ["Ethernet", "Local Area Connection", "Conexão Local"]:
-                speed = get_ethernet_link_speed_windows(adapter_name_hint=hint)
-                if speed is not None: active_interface,connection_type,link_speed = hint,"Ethernet",speed; break
+            speed = get_ethernet_link_speed_windows(adapter_name_hint="Ethernet")
+            if speed is None:
+                speed = get_ethernet_link_speed_windows(adapter_name_hint="Conexão Local")
+            if speed is not None: active_interface,connection_type,link_speed = "Ethernet Padrão","Ethernet",speed
         elif sistema_operacional == "Darwin":
             for port in ['en0', 'en1', 'en2']:
                 speed = get_ethernet_link_speed_macos(interface_port=port)
@@ -465,7 +614,6 @@ def encerrar_processo_por_pid(pid):
     try:
         p = psutil.Process(pid)
         p.terminate() 
-        # p.kill() 
         return True, "Processo encerrado com sucesso."
     except psutil.NoSuchProcess:
         return False, "Processo não encontrado (já encerrado ou PID inválido)."
@@ -477,35 +625,30 @@ def encerrar_processo_por_pid(pid):
 # --- Funções de Monitoramento (Core) ---
 def capturar_processos_sistema():
     processos_lista = []
-    # Obter o PID do processo atual (o script Python que está executando)
     current_pid = os.getpid()
 
-    # Lista de processos essenciais do sistema a serem excluídos (adicione mais conforme necessário para seu SO)
-    # Exemplos para Windows:
     system_essentials_windows = [
         "System Idle Process", "System", "smss.exe", "csrss.exe", "wininit.exe",
         "services.exe", "lsass.exe", "winlogon.exe", "dwm.exe", "spoolsv.exe",
-        "explorer.exe", # Cuidado ao excluir o explorer.exe, pois ele é a shell gráfica
-        "nvcontainer.exe", "nvdisplay.exe", # Processos NVIDIA comuns e essenciais
-        "audiodg.exe", # Serviço de áudio
-        "fontdrvhost.exe", # Host do driver de fonte
-        "dllhost.exe", # Processo host para dlls COM
-        "conhost.exe", # Host de console
-        "ctfmon.exe" # Serviço de teclado e entrada
+        "explorer.exe", 
+        "nvcontainer.exe", "nvdisplay.exe", 
+        "audiodg.exe", 
+        "fontdrvhost.exe", 
+        "dllhost.exe", 
+        "conhost.exe", 
+        "ctfmon.exe" 
     ]
-    # Exemplos para Linux:
     system_essentials_linux = [
         "init", "systemd", "kthreadd", "ksoftirqd", "rcu_sched", "migration/0",
         "cpuhp/0", "kdevtmpfs", "inet_frags", "kauditd", "jbd2/", "ext4/",
-        "Xorg", # Servidor X (interface gráfica)
-        "gnome-shell", "kdeinit5", # Shells de desktop comuns
-        "dbus-daemon", "pulseaudio", "pipewire" # Serviços de sistema
+        "Xorg", 
+        "gnome-shell", "kdeinit5", 
+        "dbus-daemon", "pulseaudio", "pipewire" 
     ]
 
-    # Escolher a lista de essenciais baseada no SO
-    if os.name == 'nt': # 'nt' para Windows
+    if os.name == 'nt': 
         system_essentials_to_exclude = system_essentials_windows
-    else: # Assume-se Linux/Unix para outros casos
+    else: 
         system_essentials_to_exclude = system_essentials_linux
 
     for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'username']):
@@ -597,7 +740,6 @@ def criar_alerta_jira_issue(componente_tipo, severidade, resumo_especifico, desc
         print(f"AVISO Jira: Não configurado. Alerta para '{componente_tipo}' não enviado.")
         return False
 
-    # --- INÍCIO DA MODIFICAÇÃO ---
     recurso_para_jira = JIRA_RECURSO_MAP.get(componente_tipo)
 
     if not recurso_para_jira:
@@ -703,8 +845,6 @@ def monitoramento_em_tempo_real(id_maquina_param):
                 payload_proc = {'timestamp':timestamp_ciclo.isoformat(),'processos':processos_atuais}
                 enviar_dados_api(API_PROCESS_ENDPOINT,id_maquina_param,payload_proc,"processos")
             
-            # Cálculo de net_upload_mbps e net_download_mbps deve permanecer aqui
-            # pois são usados por net_usage_percent e pelas próprias métricas de upload/download
             current_net_io,current_net_time = psutil.net_io_counters(),time.time()
             elapsed_time_net = current_net_time - last_net_time
             net_upload_mbps, net_download_mbps = 0.0, 0.0
@@ -715,15 +855,9 @@ def monitoramento_em_tempo_real(id_maquina_param):
                 net_download_mbps = (bytes_recv_delta*8)/(elapsed_time_net*1024*1024)
             last_net_io,last_net_time = current_net_io,current_net_time
 
-            # O print de DEBUG da velocidade do link no loop também deve ser movido para dentro do loop
-            # para refletir o valor que será usado no cálculo, caso ele seja atualizado em algum momento.
-            # No seu código, current_link_speed_mbps é fixo após a primeira chamada.
-            # Se a velocidade do link puder mudar dinamicamente (ex: Wi-Fi reconecta com velocidade diferente),
-            # você precisaria chamar get_active_network_link_info dentro do loop também.
-            # Por enquanto, mantemos a lógica que você tinha, mas com o print no lugar certo.
             print(f"DEBUG: Velocidade do Link no Loop (para cálculo): {current_link_speed_mbps} Mbps") 
 
-            for metrica_cfg_db in metricas_a_monitorar: # metrica_cfg_db agora contém os thresholds do DB
+            for metrica_cfg_db in metricas_a_monitorar: 
                 id_componente,tipo_metrica,unidade_db = metrica_cfg_db['id_componente'],metrica_cfg_db['tipo'],metrica_cfg_db['unidade_medida']
                 valor_atual,unidade_envio = None,unidade_db
                 
@@ -737,21 +871,19 @@ def monitoramento_em_tempo_real(id_maquina_param):
                     elif tipo_metrica == 'net_download': valor_atual,unidade_envio = net_download_mbps,"Mbps"
                     elif tipo_metrica == 'link_speed_mbps': valor_atual,unidade_envio = current_link_speed_mbps,"Mbps"
                     elif tipo_metrica == 'net_usage_percent':
-                        # A lógica de cálculo e fallback para net_usage_percent agora está aqui
                         print(f"DEBUG: current_link_speed_mbps para net_usage_percent: {current_link_speed_mbps}")
                         if current_link_speed_mbps is not None and current_link_speed_mbps > 0:
                             trafego_total = net_upload_mbps + net_download_mbps
                             valor_atual = min(max((trafego_total/current_link_speed_mbps)*100,0.0),100.0)
                         else: 
-                            # Fallback: Se a velocidade do link não for detectada, usa um valor padrão para o cálculo
-                            fallback_link_speed_mbps = 100.0 # Exemplo: assume um link de 100 Mbps
+                            fallback_link_speed_mbps = 100.0 
                             trafego_total = net_upload_mbps + net_download_mbps
                             if fallback_link_speed_mbps > 0:
                                 valor_atual = min(max((trafego_total / fallback_link_speed_mbps) * 100, 0.0), 100.0)
                             else:
                                 valor_atual = 0.0 
                             print(f"AVISO: Velocidade do link de rede não detectada ou é zero. Usando fallback ({fallback_link_speed_mbps} Mbps) para cálculo de net_usage_percent. Valor: {valor_atual:.2f}%")
-                        unidade_envio = "%" # Garante que a unidade seja definida
+                        unidade_envio = "%" 
                     elif tipo_metrica == 'battery_percent': valor_atual = psutil.sensors_battery().percent if psutil.sensors_battery() else 0
                     elif tipo_metrica == 'cpu_freq_ghz': cpu_f=psutil.cpu_freq(); valor_atual=(cpu_f.current/1000) if cpu_f else 0; unidade_envio="GHz"
                     elif tipo_metrica == 'uptime_hours': valor_atual = (time.time()-psutil.boot_time())/3600
@@ -796,7 +928,6 @@ def monitoramento_em_tempo_real(id_maquina_param):
                                             print(f"ℹ️ Alerta Uptime Elevado para {tipo_metrica} ({valor_atual:.1f}) ativado. Cooldown.")
                         
                         dados_coletados_ciclo.append({'tipo':tipo_metrica,'valor':valor_atual,'unidade':unidade_envio})
-                        # salvar_metrica_historico(id_componente,valor_atual,timestamp_ciclo)
                         payload_api = {"timestamp":timestamp_ciclo.isoformat(),"tipo":tipo_metrica,
                                        "valor":round(valor_atual,4) if isinstance(valor_atual,float) else valor_atual,
                                        "unidade":unidade_envio,"serial_number":serial_number}
@@ -866,13 +997,25 @@ def gerenciar_metricas_maquina(id_maquina_param):
 # --- Função Principal de Execução ---
 def executar():
     id_maquina_ativo = None
-    registrada, id_maquina_registrada, _ = verificar_maquina_registrada()
-    if registrada: id_maquina_ativo = id_maquina_registrada
+    fk_maquina_modelo_atual = None 
+    registrada, id_maquina_registrada, id_empresa_registrada, fk_maquina_modelo_atual = verificar_maquina_registrada()
+    
+    if registrada:
+        id_maquina_ativo = id_maquina_registrada
+        if fk_maquina_modelo_atual is None:
+            print(f"\nAVISO: A máquina '{serial_number}' não possui um modelo atribuído.")
+            obter_ou_atribuir_modelo_maquina(id_maquina_ativo, fk_maquina_modelo_atual)
     else:
-        login_sucesso, id_maquina_apos_login, _ = fazer_login_e_registrar_maquina()
-        if login_sucesso and id_maquina_apos_login: id_maquina_ativo = id_maquina_apos_login
-        else: print("❌ Falha login/registro. Encerrando."); encerrar_servico(); return
-    if not id_maquina_ativo: print("ERRO CRÍTICO: ID de máquina inválido. Encerrando."); encerrar_servico(); return
+        login_sucesso, id_maquina_apos_login, id_empresa_apos_login = fazer_login_e_registrar_maquina()
+        if login_sucesso and id_maquina_apos_login:
+            id_maquina_ativo = id_maquina_apos_login
+            obter_ou_atribuir_modelo_maquina(id_maquina_ativo, None) 
+        else:
+            print("❌ Falha login/registro. Encerrando."); encerrar_servico(); return
+    
+    if not id_maquina_ativo: 
+        print("ERRO CRÍTICO: ID de máquina inválido. Encerrando."); encerrar_servico(); return
+
     def menu_inicial_display(): print_linha(); print(" Bem-vindo ao Sentinela v2.0 ".center(73, "=")); print_linha()
     def escolha_usuario_display():
         print_linha(); print("\nOpções:");
@@ -893,15 +1036,4 @@ if __name__ == "__main__":
         print("Obtendo informações de rede para configuração inicial...")
         get_active_network_link_info(verbose=False) 
         print("Pronto para iniciar.")
-        # # --- Bloco de Correção Temporário (Exemplo, ajuste o ID e rode uma vez se necessário) ---
-        # id_da_maquina_para_corrigir = 2 # Coloque o ID da sua máquina aqui
-        # print(f"\n--- EXECUTANDO CORREÇÃO/ATUALIZAÇÃO DE MÉTRICAS PARA MÁQUINA ID {id_da_maquina_para_corrigir} ---")
-        # try:
-        #     cadastrar_metricas_padrao(id_da_maquina_para_corrigir) # Isso vai popular os novos campos de threshold com defaults
-        #     print(f"--- CORREÇÃO/ATUALIZAÇÃO DE MÉTRICAS CONCLUÍDA PARA MÁQUINA ID {id_da_maquina_para_corrigir} ---")
-        # except Exception as e_fix:
-        #     print(f"Ocorreu um erro durante a correção das métricas: {e_fix}")
-        # print("\nBloco de correção executado/verificado. Para operação normal, comente este bloco e descomente 'executar()'.")
-        # # --- Fim do Bloco de Correção ---
-        
-        executar() # Comente esta linha se estiver rodando o bloco de correção acima. Descomente para operação normal.
+        executar()
