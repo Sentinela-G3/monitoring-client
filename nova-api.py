@@ -318,14 +318,6 @@ def cadastrar_metricas_padrao(id_maquina_param):
             elif metrica_info['tipo'] == 'net_upload':
                 if threshold_grave_val is None: 
                     threshold_grave_val = NET_UPLOAD_NO_CONNECTION_THRESHOLD
-                # Não há limiares "leve" ou "critico" definidos por padrão para net_upload (sem conexão) nas constantes globais.
-            # --- FIM DA MODIFICAÇÃO PROPOSTA ---
-
-            # min_default_val e max_default_val não são usados para os thresholds, mas podem ser úteis para outras lógicas
-            # min_default_val = 0
-            # max_default_val = 100
-            # if metrica_info['tipo'] in ['net_upload','net_download','link_speed_mbps']:
-            #      max_default_val = 1000
 
             sql_componente = """
                 INSERT INTO componente (
@@ -468,18 +460,125 @@ def get_active_network_link_info(verbose=True):
     if link_speed is None and verbose: print("Não foi possível determinar velocidade do link.")
     return {'speed_mbps':link_speed,'type':connection_type,'interface':active_interface,'modelo_detalhado':f"{connection_type} ({active_interface})"}
 
+
+def encerrar_processo_por_pid(pid):
+    try:
+        p = psutil.Process(pid)
+        p.terminate() 
+        # p.kill() 
+        return True, "Processo encerrado com sucesso."
+    except psutil.NoSuchProcess:
+        return False, "Processo não encontrado (já encerrado ou PID inválido)."
+    except psutil.AccessDenied:
+        return False, "Acesso negado para encerrar o processo."
+    except Exception as e:
+        return False, f"Erro inesperado ao encerrar: {e}"
+
 # --- Funções de Monitoramento (Core) ---
 def capturar_processos_sistema():
     processos_lista = []
-    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+    # Obter o PID do processo atual (o script Python que está executando)
+    current_pid = os.getpid()
+
+    # Lista de processos essenciais do sistema a serem excluídos (adicione mais conforme necessário para seu SO)
+    # Exemplos para Windows:
+    system_essentials_windows = [
+        "System Idle Process", "System", "smss.exe", "csrss.exe", "wininit.exe",
+        "services.exe", "lsass.exe", "winlogon.exe", "dwm.exe", "spoolsv.exe",
+        "explorer.exe", # Cuidado ao excluir o explorer.exe, pois ele é a shell gráfica
+        "nvcontainer.exe", "nvdisplay.exe", # Processos NVIDIA comuns e essenciais
+        "audiodg.exe", # Serviço de áudio
+        "fontdrvhost.exe", # Host do driver de fonte
+        "dllhost.exe", # Processo host para dlls COM
+        "conhost.exe", # Host de console
+        "ctfmon.exe" # Serviço de teclado e entrada
+    ]
+    # Exemplos para Linux:
+    system_essentials_linux = [
+        "init", "systemd", "kthreadd", "ksoftirqd", "rcu_sched", "migration/0",
+        "cpuhp/0", "kdevtmpfs", "inet_frags", "kauditd", "jbd2/", "ext4/",
+        "Xorg", # Servidor X (interface gráfica)
+        "gnome-shell", "kdeinit5", # Shells de desktop comuns
+        "dbus-daemon", "pulseaudio", "pipewire" # Serviços de sistema
+    ]
+
+    # Escolher a lista de essenciais baseada no SO
+    if os.name == 'nt': # 'nt' para Windows
+        system_essentials_to_exclude = system_essentials_windows
+    else: # Assume-se Linux/Unix para outros casos
+        system_essentials_to_exclude = system_essentials_linux
+
+    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'username']):
         try:
             info = proc.info
-            if info['name'] and info['name'] != "System" and info['pid'] != 0:
-                processos_lista.append({'timestamp': datetime.now().isoformat(), 'pid': info['pid'], 
-                                       'nome': info['name'], 'cpu_percent': info['cpu_percent'], 
-                                       'memory_percent': info['memory_percent']})
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess): pass
+            process_name_lower = info['name'].lower() if info['name'] else ''
+
+            if (info['pid'] == current_pid or
+                process_name_lower in [name.lower() for name in system_essentials_to_exclude] or
+                not info['name'] or info['pid'] == 0):
+                continue 
+
+            processos_lista.append({
+                'timestamp': datetime.now().isoformat(),
+                'pid': info['pid'],
+                'nome': info['name'],
+                'cpu_percent': info['cpu_percent'],
+                'memory_percent': info['memory_percent']
+            })
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+        except Exception as e:
+            print(f"Erro ao processar processo {proc.pid}: {e}")
+            pass
+
     return processos_lista
+
+
+def loop_monitoramento_agente(id_maquina_atual):
+        print(f"[{datetime.now()}] Agente: Verificando comandos e coletando dados...")
+
+        try:
+            sql_select_commands = "SELECT id_comando, pid_processo, tipo_comando FROM comandos_agente WHERE id_maquina = %s AND status = 'pendente'"
+            mycursor.execute(sql_select_commands, (id_maquina_atual,))
+            comandos_pendentes = mycursor.fetchall()
+
+            if comandos_pendentes:
+                print(f"[{datetime.now()}] Agente: {len(comandos_pendentes)} comando(s) pendente(s) encontrado(s).")
+            else:
+                print(f"[{datetime.now()}] Agente: Nenhum comando pendente.")
+
+            for comando in comandos_pendentes:
+                try:
+                    id_comando = comando['id_comando']
+                    pid_processo = comando['pid_processo']
+                    tipo_comando = comando['tipo_comando']
+                except TypeError:
+                    id_comando = comando[0]
+                    pid_processo = comando[1]
+                    tipo_comando = comando[2]
+
+                print(f"[{datetime.now()}] Agente: Processando comando {id_comando}: Tipo '{tipo_comando}', PID {pid_processo}")
+
+                sql_update_executing = "UPDATE comandos_agente SET status = 'executando', data_execucao = %s WHERE id_comando = %s"
+                mycursor.execute(sql_update_executing, (datetime.now(), id_comando))
+                cnx.commit()
+
+                sucesso, mensagem = False, "Tipo de comando desconhecido."
+                if tipo_comando == 'encerrar_processo':
+                    sucesso, mensagem = encerrar_processo_por_pid(pid_processo)
+
+                status_final = 'sucesso' if sucesso else 'falha'
+                sql_update_final = "UPDATE comandos_agente SET status = %s, mensagem_status = %s WHERE id_comando = %s"
+                mycursor.execute(sql_update_final, (status_final, mensagem, id_comando))
+                cnx.commit()
+                print(f"[{datetime.now()}] Agente: Comando {id_comando} - Resultado: {status_final} - {mensagem}")
+
+            processos_ativos = capturar_processos_sistema()
+
+        except Exception as e:
+            print(f"❌ Erro no loop de monitoramento: {e}")
+            pass
+
 
 def enviar_dados_api(endpoint_path_template, id_maquina_param, payload_data, description):
     if not CONFIG[AMBIENTE].get("local_web_app_host") or not CONFIG[AMBIENTE].get("local_web_app_port"):
@@ -591,8 +690,13 @@ def monitoramento_em_tempo_real(id_maquina_param):
     print("Métricas monitoradas (do DB):"); [print(f"- Tipo: {m['tipo']} (ID Comp: {m['id_componente']})") for m in metricas_a_monitorar]; print_linha()
     last_net_io, last_net_time = psutil.net_io_counters(), time.time()
     
+
+    
+    
     try:
         while True:
+            # Rodando agente de comandos
+            loop_monitoramento_agente(id_maquina_param)
             timestamp_ciclo = datetime.now(); dados_coletados_ciclo = []
             processos_atuais = capturar_processos_sistema()
             if processos_atuais:
