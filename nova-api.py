@@ -246,13 +246,13 @@ def verificar_maquina_registrada():
     print_linha()
     print("🔍 Buscando máquina...")
     
-    sql = "SELECT id_maquina, fk_maquina_empresa, modelo FROM maquina WHERE serial_number = %s"
+    sql = "SELECT id_maquina, fk_maquina_empresa, fk_modelo FROM maquina WHERE serial_number = %s"
     mycursor.execute(sql, (serial_number,))
     resultado = mycursor.fetchone()
     if resultado:
         id_maquina_atual = resultado['id_maquina']
         id_empresa_global = resultado['fk_maquina_empresa']
-        fk_maquina_modelo = resultado['modelo']
+        fk_maquina_modelo = resultado['fk_modelo']
         print(f"✅ Máquina '{serial_number}' (ID:{id_maquina_atual}) encontrada, empresa ID:{id_empresa_global}.")
         return True, id_maquina_atual, id_empresa_global, fk_maquina_modelo
     print(f"❌ Máquina '{serial_number}' não encontrada.")
@@ -287,7 +287,7 @@ def cadastrar_maquina_atual(id_empresa_param):
     print_linha()
     print(f"SO: {sistema_detalhado}\nSerial: {serial_number}\nINICIANDO CADASTRO...")
     try:
-        sql_insert = "INSERT INTO maquina (so, serial_number, setor, fk_maquina_empresa, modelo) VALUES (%s, %s, %s, %s, NULL)"
+        sql_insert = "INSERT INTO maquina (so, serial_number, setor, fk_maquina_empresa, fk_modelo) VALUES (%s, %s, %s, %s, NULL)"
         mycursor.execute(sql_insert, (sistema_detalhado, serial_number, setor, id_empresa_param))
         cnx.commit()
         id_maquina_nova = mycursor.lastrowid
@@ -457,7 +457,7 @@ def obter_ou_atribuir_modelo_maquina(id_maquina_param, modelo_atual_id):
     
     if id_modelo_selecionado:
         try:
-            sql_update = "UPDATE maquina SET modelo = %s WHERE id_maquina = %s"
+            sql_update = "UPDATE maquina SET fk_modelo = %s WHERE id_maquina = %s"
             mycursor.execute(sql_update, (id_modelo_selecionado, id_maquina_param))
             cnx.commit()
             print(f"✅ Modelo atribuído à máquina ID {id_maquina_param} com sucesso!")
