@@ -57,7 +57,7 @@ JIRA_RECURSO_MAP = {
     "net_upload": "Rede",    
     "net_download": "Rede",
     "link_speed_mbps": "Rede",
-    "net_usage_percent": "Rede",
+    "net_usage": "Rede",
     "battery_percent": "Bateria",   
     "cpu_freq_ghz": "CPU",     
     "uptime_hours": "Tempo de Uso"   
@@ -78,7 +78,7 @@ METRIC_THRESHOLDS_FAIXA = {
         "grave":   {"val": DISK_HIGH_THRESHOLD,      "sum": "Disco - Nível Grave", "desc": "Uso de Disco ('/') em {v:.1f}%"},
         "leve":    {"val": 70.0,                     "sum": "Disco - Nível Leve",    "desc": "Uso de Disco ('/') em {v:.1f}"}
     },
-    "net_usage_percent": {
+    "net_usage": {
         "critico": {"val": NETWORK_USAGE_HIGH_THRESHOLD, "sum": "Uso de Rede - Crítico", "desc": "Aumento crítico no uso do link ({v:.1f}%)"},
         "grave":   {"val": 75.0,                         "sum": "Uso de Rede - Grave",   "desc": "Aumento grave no uso do link ({v:.1f}%)"},
         "leve":    {"val": 60.0,                         "sum": "Uso de Rede - Leve",    "desc": "Leve aumento no uso do link ({v:.1f}%)"}
@@ -311,7 +311,7 @@ def cadastrar_metricas_padrao(id_maquina_param):
         {"tipo": "net_upload", "descricao": "Velocidade de Upload Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "net_download", "descricao": "Velocidade de Download Atual", "modelo": modelo_rede_principal, "unidade": "Mbps"},
         {"tipo": "link_speed_mbps", "descricao": "Velocidade do Link de Rede", "modelo": modelo_rede_principal, "unidade": "Mbps"},
-        {"tipo": "net_usage_percent", "descricao": "Percentual de Uso do Link de Rede", "modelo": modelo_rede_principal, "unidade": "%"},
+        {"tipo": "net_usage", "descricao": "Percentual de Uso do Link de Rede", "modelo": modelo_rede_principal, "unidade": "%"},
         {"tipo": "battery_percent", "descricao": "Bateria em uso", "modelo": "Bateria", "unidade": "%"},
         {"tipo": "cpu_freq_ghz", "descricao": "Frequência da CPU", "modelo": processador_modelo, "unidade": "GHz"},
         {"tipo": "uptime_hours", "descricao": "Tempo de atividade", "modelo": "Sistema", "unidade": "horas"}
@@ -871,8 +871,8 @@ def monitoramento_em_tempo_real(id_maquina_param):
                     elif tipo_metrica == 'net_upload': valor_atual,unidade_envio = net_upload_mbps,"Mbps"
                     elif tipo_metrica == 'net_download': valor_atual,unidade_envio = net_download_mbps,"Mbps"
                     elif tipo_metrica == 'link_speed_mbps': valor_atual,unidade_envio = current_link_speed_mbps,"Mbps"
-                    elif tipo_metrica == 'net_usage_percent':
-                        print(f"DEBUG: current_link_speed_mbps para net_usage_percent: {current_link_speed_mbps}")
+                    elif tipo_metrica == 'net_usage':
+                        print(f"DEBUG: current_link_speed_mbps para net_usage: {current_link_speed_mbps}")
                         if current_link_speed_mbps is not None and current_link_speed_mbps > 0:
                             trafego_total = net_upload_mbps + net_download_mbps
                             valor_atual = min(max((trafego_total/current_link_speed_mbps)*100,0.0),100.0)
@@ -883,7 +883,7 @@ def monitoramento_em_tempo_real(id_maquina_param):
                                 valor_atual = min(max((trafego_total / fallback_link_speed_mbps) * 100, 0.0), 100.0)
                             else:
                                 valor_atual = 0.0 
-                            print(f"AVISO: Velocidade do link de rede não detectada ou é zero. Usando fallback ({fallback_link_speed_mbps} Mbps) para cálculo de net_usage_percent. Valor: {valor_atual:.2f}%")
+                            print(f"AVISO: Velocidade do link de rede não detectada ou é zero. Usando fallback ({fallback_link_speed_mbps} Mbps) para cálculo de net_usage. Valor: {valor_atual:.2f}%")
                         unidade_envio = "%" 
                     elif tipo_metrica == 'battery_percent': valor_atual = psutil.sensors_battery().percent if psutil.sensors_battery() else 0
                     elif tipo_metrica == 'cpu_freq_ghz': cpu_f=psutil.cpu_freq(); valor_atual=(cpu_f.current/1000) if cpu_f else 0; unidade_envio="GHz"
